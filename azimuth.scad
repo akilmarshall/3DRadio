@@ -46,26 +46,32 @@ module drive_gear(diameter=DG_DIAMETER, teeth=DG_TEETH, thickness=DG_THICKNESS) 
 
 SB_HEIGHT = 50;
 SB_BASE_DIAM = 100;
-SB_CS_RADIUS = 17;
-SB_CS_DEPTH = 20;
-SB_MM_WIDTH = 37;  // Y dimension
-SB_MM_DEPTH = 46;  // X dimenion
-SB_MM_HEIGHT = 5;  // Z dimension
+SB_CS_RADIUS = 16;
+SB_CS_DEPTH = 10;
 SB_WIRE_PORT_D = 25;
-SB_MOUNT_HOLE_DEPTH = 30;
+SB_MOUNT_HOLE_DEPTH = 10;
+AZ_MOTOR_SIZE = 17;
+AZ_MOTOR_MASK_DEPTH = 7;
+AZ_MOTOR_SHAFT_LEN = 25;
+AZ_MOTOR_SLOT = 4;
+AZ_MOTOR_INFO = nema_motor_info(AZ_MOTOR_SIZE);
+AZ_MOTOR_WIDTH = AZ_MOTOR_INFO[0];
+AZ_MOTOR_HEIGHT = 40;
+AZ_MOTOR_MOUNT_WIDTH = 43;
+AZ_MOTOR_MOUNT_DEPTH = 50;
+AZ_MOTOR_MOUNT_THICK = 5;
 module static_base(height=SB_HEIGHT, hole_diameter=LS_MOUNT_HOLE_D, mount_hole_diam=LS_MOUNT_DIAM_1, base_diameter=SB_BASE_DIAM, center_diameter=LS_DIAM_1, cs_radius=SB_CS_RADIUS, cs_depth=SB_CS_DEPTH) {
     half = mount_hole_diam / 2;
 
     difference() {
-        down(height/2)
-        cylinder(height, d=base_diameter, center=false);
+        cylinder(height, d=base_diameter, center=true);
 
         color("red")
         up(0.02 + height/2)
         base_holes(hole_diameter, mount_hole_diam, SB_MOUNT_HOLE_DEPTH);
 
         color("purple")
-        up(SB_CS_DEPTH / 2)
+        up(SB_CS_DEPTH + 10)
         base_holes(cs_radius, mount_hole_diam, (1 * cs_depth));
 
         color("blue")
@@ -80,42 +86,37 @@ module static_base(height=SB_HEIGHT, hole_diameter=LS_MOUNT_HOLE_D, mount_hole_d
             cylinder(2 * (SB_BASE_DIAM - LS_DIAM_1), d=SB_WIRE_PORT_D, center=false);
         }
     }
-    difference() {
-        color("red")
-        up(2 + 12 + SB_MM_HEIGHT / 2)
-        right(DG_PITCH_RADIUS + AG_PITCH_RADIUS - 3.2)
-        cube([SB_MM_DEPTH, SB_MM_WIDTH, SB_MM_HEIGHT], center=true);
-
-        up(2 + 12 + (SB_MM_HEIGHT / 2))
-        right(DG_PITCH_RADIUS + AG_PITCH_RADIUS)
-        union() {
-            rotate([0, 0, 90])
-            nema_mount_mask(size=17, depth=SB_MM_HEIGHT+2, l=3);
+    down(5) // idk where this height is coming from...
+    up(AZ_MOTOR_HEIGHT/2) {
+    right(DG_PITCH_RADIUS + AG_PITCH_RADIUS) {
+        difference() {
+            left((LS_DIAM_3 - LS_DIAM_2) / 8)
+            cube([AZ_MOTOR_MOUNT_DEPTH, AZ_MOTOR_MOUNT_WIDTH, AZ_MOTOR_MOUNT_THICK], center=true);
+            zrot(90)
+            nema_mount_mask(AZ_MOTOR_SIZE, l=AZ_MOTOR_SLOT, depth=AZ_MOTOR_MASK_DEPTH);
+        }
+        color("green") {
+            up(AZ_MOTOR_MOUNT_THICK / 2)
+            left((LS_DIAM_3 - LS_DIAM_2) / 8 +AZ_MOTOR_MOUNT_DEPTH / 2)
+            fwd(AZ_MOTOR_MOUNT_THICK + AZ_MOTOR_MOUNT_WIDTH / 2)
+            xrot(-90)
+            linear_extrude(AZ_MOTOR_MOUNT_THICK)
+            right_triangle([AZ_MOTOR_MOUNT_DEPTH, AZ_MOTOR_HEIGHT]);
+        }
+        color("green") {
+            up(AZ_MOTOR_MOUNT_THICK / 2)
+            left((LS_DIAM_3 - LS_DIAM_2) / 8 +AZ_MOTOR_MOUNT_DEPTH / 2)
+            back(AZ_MOTOR_MOUNT_WIDTH / 2)
+            xrot(-90)
+            linear_extrude(AZ_MOTOR_MOUNT_THICK)
+            right_triangle([AZ_MOTOR_MOUNT_DEPTH, AZ_MOTOR_HEIGHT]);
         }
     }
-    color("purple") {
-    up(2 + 12 + SB_MM_HEIGHT)
-    right(-5.0 + DG_PITCH_RADIUS + AG_PITCH_RADIUS - SB_MM_DEPTH / 2)
-    fwd(SB_MM_WIDTH / 2)
-    xrot(-90)
-    down(5)
-    linear_extrude(5)
-    right_triangle([1.8 + SB_MM_DEPTH, SB_MM_WIDTH]);
     }
-
-    color("purple") {
-    up(2 + 12 + SB_MM_HEIGHT)
-    right(-5.0 + DG_PITCH_RADIUS + AG_PITCH_RADIUS - SB_MM_DEPTH / 2)
-    back(SB_MM_HEIGHT + SB_MM_WIDTH / 2)
-    xrot(-90)
-    down(5)
-    linear_extrude(5)
-    right_triangle([1.8 + SB_MM_DEPTH, SB_MM_WIDTH]);
-    }
-    /* up(2 + 12 + (SB_MM_HEIGHT / 2)) */
-    /* right(DG_PITCH_RADIUS + AG_PITCH_RADIUS) */
-    /* nema_stepper_motor(size=17, shaft_len=25, h=39); */
-
+    //down(5) // idk where this height is coming from...
+    //up(AZ_MOTOR_HEIGHT/2)
+    //right(DG_PITCH_RADIUS + AG_PITCH_RADIUS)
+    //nema_stepper_motor(size=AZ_MOTOR_SIZE, shaft_len=AZ_MOTOR_SHAFT_LEN, h=AZ_MOTOR_HEIGHT);
 }
 
 AG_HEIGHT = 5;
