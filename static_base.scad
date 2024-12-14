@@ -2,7 +2,7 @@ include <BOSL2/std.scad>
 include <BOSL2/nema_steppers.scad>
 
 include <lazy_susan.scad>
-include <azimuth_gears.scad>
+include <gears.scad>
 
 
 SB_DIAM = 100;
