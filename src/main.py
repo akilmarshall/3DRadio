@@ -1,4 +1,6 @@
 import board
+import logging
+from drive import Drive
 
 
 logging.basicConfig(level=logging.DEBUG)
