@@ -22,10 +22,10 @@ class Drive:
 
         LOGGER.debug(f'setting up PWM pins {A1 = } {A2 = } {B1 = } {B2 = }')
         # internal PWM frequency of the driver board is 50kHz
-        self.A1 = PWMOut(A1, frequency=5000)
-        self.A2 = PWMOut(A2, frequency=5000)
-        self.B1 = PWMOut(B1, frequency=5000)
-        self.B2 = PWMOut(B2, frequency=5000)
+        self.A1 = PWMOut(A1)
+        self.A2 = PWMOut(A2)
+        self.B1 = PWMOut(B1)
+        self.B2 = PWMOut(B2)
         LOGGER.debug('finished setting up PWM pins')
         # setup hall effect switch
         LOGGER.debug(f'setting up hall switch {hall}')
@@ -106,7 +106,7 @@ class Drive:
     def mstep_backward(self, delay=None):
         self._step(FORWARD, MICROSTEP, self.delay if delay is None else delay)
 
-    def home(self):
+    def home(self, hold=False):
         LOGGER.debug('starting homing procedure')
         self.set_rpm(self.rpm() / 2)  # slow down during homing
 
@@ -139,7 +139,8 @@ class Drive:
         self.north = self._compass()
         self.position = 0  # 
         self.homed = True
-        # self.motor.release()
+        if not hold:
+            self.motor.release()
         self.set_rpm(self.rpm() * 2)  # speed back up now that homing is done
         LOGGER.info('drive homed')
 
@@ -156,7 +157,7 @@ class Drive:
             return n_a, error_a
         return n_b, error_b
 
-    def slew(self, D):
+    def slew(self, D, hold=False):
         '''
         Slew the drive to angle D corrected with a compass
         0 deg is North
@@ -190,5 +191,6 @@ class Drive:
                 self.mstep_backward()
         self.slewing = False
         sleep(self.delay)
-        # self.motor.release()
+        if not hold:
+            self.motor.release()
         LOGGER.info(f'slew complete, {self.position = } {self.error}')
