@@ -3,16 +3,18 @@ include <BOSL2/std.scad>
 include <lazy_susan.scad>
 
 
-SR_THICKNESS = 8;
+SR_THICKNESS = 6;
 SR_DIAM_1 = 22.1;
 SR_DIAM_2 = 35;
 SR_DIAM_3 = 45;
 SR_MOUNT_HOLE_DIAM = 5.5;
-SR_ARM_WIDTH = 12;
+SR_ARM_WIDTH = 14;
 SR_ARM_RADIUS = (SR_MOUNT_HOLE_DIAM + LS_MOUNT_DIAM_1) / 2;
-SR_ARM_PADDING = 6;  // extra length on the arm after the hole
+SR_ARM_PADDING = 5;  // extra length on the arm after the hole
 SR_CS_DIAM = 9;
 SR_CS_DEPTH = 3;
+SR_MAGNET_DIAM = 5.5;
+SR_MAGNET_HEIGHT = 2.5;
 module slipring_mount() {
     module cylindrical_body() {
         cylinder(SR_THICKNESS, d=SR_DIAM_3, center=true);
@@ -79,9 +81,16 @@ module slipring_mount() {
         static_base_mount_holes();
 
         // countersink for static base mount holes
-        color("blue")
+        color("steelblue")
         static_base_mount_cs();
-    }
-}
 
-slipring_mount();
+        // slot for magnet
+        color("steelblue")
+        fwd(SR_ARM_WIDTH/2)
+        left(2 + SR_MAGNET_HEIGHT / 2)
+        right(LS_DIAM_2/2)
+        yrot(90)
+        cylinder(SR_MAGNET_HEIGHT, d=SR_MAGNET_DIAM, center=true);
+    }
+
+}

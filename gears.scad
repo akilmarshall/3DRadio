@@ -33,11 +33,14 @@ module azimuth_drive_gear() {
     }
 }
 
-AZ_GEAR_THICKNESS = 8;
+AZ_GEAR_THICKNESS = 6;
 AZ_GEAR_DIAMETER = 120;
 AZ_GEAR_TEETH = 149;
 AZ_GEAR_PITCH_RADIUS = pitch_radius(mod=AZ_GEAR_DIAMETER / AZ_GEAR_TEETH, teeth=AZ_GEAR_TEETH);
 AZ_GEAR_MOUNT_HOLE_DIAM = 5.5;
+AZ_SENSOR_WIDTH = 2.5;
+AZ_SENSOR_DEPTH = 4.2;
+AZ_SENSOR_Z = 1; // distance from the sensor to the interior and bottom of the gear
 module azimuth_gear() {
     let (mod = AZ_GEAR_DIAMETER / AZ_GEAR_TEETH) {
         difference() {
@@ -56,6 +59,13 @@ module azimuth_gear() {
             // center cavity
             color("steelblue")
             cylinder(0.2 + AZ_GEAR_THICKNESS, d=LS_DIAM_2, center=true);
+
+            // cavity for U58 hall effect sensor
+            color("steelblue")
+            zrot(45)
+            up(AZ_SENSOR_Z)
+            right(AZ_SENSOR_Z + (AZ_SENSOR_WIDTH + LS_DIAM_2) / 2)
+            cube([AZ_SENSOR_WIDTH, AZ_SENSOR_DEPTH, AZ_GEAR_THICKNESS], center=true);
         }
     }
 }
