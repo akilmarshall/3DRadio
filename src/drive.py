@@ -86,7 +86,7 @@ class Drive:
         LOGGER.debug(f'changing rpm from {self.rpm()} to {rpm}')
         steps = (360 / Drive.STEP_ANGLE) * (1 / self.ratio)
         self.delay = 60 / (steps * rpm)
-        LOGGER.info(f'rpm changed to {rpm}')
+        LOGGER.info(f'rpm set to {rpm}')
 
     def step_forward(self, delay=None):
         self._step(BACKWARD, SINGLE, self.delay if delay is None else delay)
@@ -128,12 +128,13 @@ class Drive:
             width += 1
             self.mstep_forward()
 
-        LOGGER.debug(f'{width = }')
+        LOGGER.debug(f'{width = } steps')
 
-        for _ in range(width // 2):
+        center = width // 2
+        for _ in range(center):
             self.mstep_backward()
 
-        LOGGER.debug('centered within home region')
+        LOGGER.debug(f'centered within home region at step {center}')
 
         # ok we are home
         self.north = self._compass()
@@ -167,16 +168,16 @@ class Drive:
 
         (should compass north be read each slew or should the north position when it was homed be used?)
         '''
-        LOGGER.info(f'slewing to {D}, current {self.position = }')
+        LOGGER.info(f'slewing to {D:.5f}, current {self.position = :.5f}')
         if (abs(D) >= 360):
             D = D % 360
         self.slewing = True
         distance = (D + self.north) - self.position
-        LOGGER.debug(f'calculated change of position, {distance = }')
+        LOGGER.debug(f'calculated change of position, {distance = :.5f}')
         if distance > 0:
             # slew forward
             steps, error = self._demand_to_step(abs(distance))
-            LOGGER.debug(f'steps to move {steps}, positional error {error}')
+            LOGGER.debug(f'steps to move {steps}, positional error {error:.5f}')
             self.position += steps * self.theta
             self.error += error
             for _ in range(steps):
@@ -184,7 +185,7 @@ class Drive:
         else:
             # slew backwards
             steps, error = self._demand_to_step(abs(distance))
-            LOGGER.debug(f'steps to move {steps}, positional error {error}')
+            LOGGER.debug(f'steps to move {steps}, positional error {error:.5f}')
             self.position -= steps * self.theta
             self.error += error
             for _ in range(steps):
@@ -193,4 +194,4 @@ class Drive:
         sleep(self.delay)
         if not hold:
             self.motor.release()
-        LOGGER.info(f'slew complete, {self.position = } {self.error}')
+        LOGGER.info(f'slew complete, {self.position = :.5f} {self.error:.5f}')
