@@ -47,7 +47,7 @@ class Drive:
         self.homed = False
 
         self.set_rpm(Drive.RPM)
-        LOGGER.info(f'initialized drive, {Drive.RPM = } {self.homed = }')
+        LOGGER.info(f'initialized drive, {Drive.RPM = :.5f} {self.homed = }')
 
     def __del__(self):
         self.motor.release()
@@ -83,10 +83,10 @@ class Drive:
         return 60 / (steps * self.delay)
 
     def set_rpm(self, rpm):
-        LOGGER.debug(f'changing rpm from {self.rpm()} to {rpm}')
+        LOGGER.debug(f'changing rpm from {self.rpm():.5f} to {rpm:.5f}')
         steps = (360 / Drive.STEP_ANGLE) * (1 / self.ratio)
         self.delay = 60 / (steps * rpm)
-        LOGGER.info(f'rpm set to {rpm}')
+        LOGGER.info(f'rpm set to {rpm:.5f}')
 
     def step_forward(self, delay=None):
         self._step(BACKWARD, SINGLE, self.delay if delay is None else delay)
