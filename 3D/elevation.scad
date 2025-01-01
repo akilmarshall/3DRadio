@@ -94,41 +94,58 @@ module elevation_mount() {
 }
 
 ES_STANDOFF_HEIGHT = 20;
-ES_STANDOFF_DIAM = 8;
-ES_STANDOFF_HOLE_DIAM = 5;
+ES_STANDOFF_DIAM = 10;
+ES_STANDOFF_HOLE_DIAM = 5.25;
 module elevation_structure_standoff() {
     for (i = [0, 90, 180, 270]) {
         zrot(i)
         right(LS_MOUNT_DIAM_2 / 2)
         difference() {
             color("linen")
-            cylinder(h=ES_STANDOFF_HEIGHT, d=ES_STANDOFF_DIAM, center=true);
+            down(ES_STANDOFF_HEIGHT / 2)
+            linear_extrude(ES_STANDOFF_HEIGHT)
+            hexagon(d=ES_STANDOFF_DIAM);
             color("steelblue")
             cylinder(h=ES_STANDOFF_HEIGHT + 2, d = ES_STANDOFF_HOLE_DIAM, center=true);
         }
     }
 }
 
-ES_BASE_THICK = 5;
+ES_BASE_THICK = 4;
 ES_BASE_EXTRA = 10;
 ES_BASE_DIAM = LS_DIAM_3 + ES_BASE_EXTRA;
-ES_BASE_CENTER_HOLE_DIAM = 32; 
+ES_BASE_CENTER_HOLE_DIAM = 25; 
 ES_BASE_MOUNT_HOLE_DIAM = 5.5;
 RPI_MOUNT_X = 58;
 RPI_MOUNT_Y = 39;
 RPI_MOUNT_HOLE_DIAM = 2.75;
 RPI_MOUNT_STANDOFF_DIAM = 6;
 RPI_MOUNT_STANDOFF_HEIGHT = 3;
-COMPASS_MOUNT_X = 20;
-COMPASS_MOUNT_Y = 10;
-COMPASS_MOUNT_HOLE_DIAM = 2.75;
+COMPASS_MOUNT_X = 20.32;  // 0.8 inche
+COMPASS_MOUNT_Y = 12.7;
+COMPASS_MOUNT_HOLE_DIAM = 2.25;
 COMPASS_MOUNT_STANDOFF_DIAM = 6;
 COMPASS_MOUNT_STANDOFF_HEIGHT = 3;
+GPS_MOUNT_X = 20.32;
+GPS_MOUNT_Y = 20.32;
+GPS_MOUNT_HOLE_DIAM = 2.25;
+GPS_MOUNT_STANDOFF_DIAM = 6;
+GPS_MOUNT_STANDOFF_HEIGHT = 5;
+LM2596_MOUNT_X = 30;
+LM2596_MOUNT_Y = 16;
+LM2596_MOUNT_HOLE_DIAM = 2.75;
+LM2596_MOUNT_STANDOFF_DIAM = 6;
+LM2596_MOUNT_STANDOFF_HEIGHT = 3;
+DRV8833_MOUNT_X = 20.32;
+DRV8833_MOUNT_Y = 0;
+DRV8833_MOUNT_HOLE_DIAM = 2.75;
+DRV8833_MOUNT_STANDOFF_DIAM = 6;
+DRV8833_MOUNT_STANDOFF_HEIGHT = 3;
 module elevation_structure_base() {
     module rpi_mount() {
         x = RPI_MOUNT_X / 2;
         y = RPI_MOUNT_Y / 2;
-        up((ES_THICK + RPI_MOUNT_STANDOFF_HEIGHT) / 2) {
+        up((ES_THICK + RPI_MOUNT_STANDOFF_HEIGHT) / 2 - 1) {
             for (i = [[1, 1], [-1, 1], [-1, -1], [1, -1]]) {
                 right(i.x * x)
                 fwd(i.y * y)
@@ -144,7 +161,7 @@ module elevation_structure_base() {
     module compass_mount() {
         x = COMPASS_MOUNT_X / 2;
         y = COMPASS_MOUNT_Y / 2;
-        up((ES_THICK + COMPASS_MOUNT_STANDOFF_HEIGHT) / 2) {
+        up((ES_THICK + COMPASS_MOUNT_STANDOFF_HEIGHT) / 2 - 1) {
             for (i = [[1, 1], [-1, 1], [-1, -1], [1, -1]]) {
                 right(i.x * x)
                 fwd(i.y * y)
@@ -157,12 +174,65 @@ module elevation_structure_base() {
             }
         }
     }
+    module gps_mount() {
+        x = GPS_MOUNT_X / 2;
+        y = GPS_MOUNT_Y / 2;
+        up((ES_THICK + GPS_MOUNT_STANDOFF_HEIGHT) / 2 - 1) {
+            for (i = [[1, 1], [-1, 1], [-1, -1], [1, -1]]) {
+                right(i.x * x)
+                fwd(i.y * y)
+                difference() {
+                    color("linen")
+                    cylinder(h=GPS_MOUNT_STANDOFF_HEIGHT, d=GPS_MOUNT_STANDOFF_DIAM, center=true);
+                    color("steelblue")
+                    cylinder(h=GPS_MOUNT_STANDOFF_HEIGHT+2, d=GPS_MOUNT_HOLE_DIAM, center=true);
+                }
+            }
+        }
+    }
+    module lm2596_mount() {
+        x = LM2596_MOUNT_X / 2;
+        y = LM2596_MOUNT_Y / 2;
+        up((ES_THICK + LM2596_MOUNT_STANDOFF_HEIGHT) / 2 - 1) {
+            for (i = [[1, 1], [-1, -1]]) {
+                right(i.x * x)
+                fwd(i.y * y)
+                difference() {
+                    color("linen")
+                    cylinder(h=LM2596_MOUNT_STANDOFF_HEIGHT, d=LM2596_MOUNT_STANDOFF_DIAM, center=true);
+                    color("steelblue")
+                    cylinder(h=LM2596_MOUNT_STANDOFF_HEIGHT+2, d=LM2596_MOUNT_HOLE_DIAM, center=true);
+                }
+            }
+        }
+    }
+    module drv8833_mount() {
+        x = DRV8833_MOUNT_X / 2;
+        y = DRV8833_MOUNT_Y / 2;
+        up((ES_THICK + DRV8833_MOUNT_STANDOFF_HEIGHT) / 2 - 1) {
+            for (i = [[1, 1], [-1, 1], [-1, -1], [1, -1]]) {
+                right(i.x * x)
+                fwd(i.y * y)
+                difference() {
+                    color("linen")
+                    cylinder(h=DRV8833_MOUNT_STANDOFF_HEIGHT, d=DRV8833_MOUNT_STANDOFF_DIAM, center=true);
+                    color("steelblue")
+                    cylinder(h=DRV8833_MOUNT_STANDOFF_HEIGHT+2, d=DRV8833_MOUNT_HOLE_DIAM, center=true);
+                }
+            }
+        }
+    }
 
     difference() {
         color("linen")
         cylinder(h=ES_BASE_THICK, d=ES_BASE_DIAM, center=true);
+        // make holes in the base for wires to pass through
         color("steelblue")
-        cylinder(h=ES_BASE_THICK + 2, d=ES_BASE_CENTER_HOLE_DIAM, center=true);
+        for (i = [-45]) {
+            zrot(i)
+            right(ES_BASE_DIAM / 2.8)
+            cylinder(h=ES_BASE_THICK + 2, d=ES_BASE_CENTER_HOLE_DIAM, center=true);
+        }
         for (i = [0, 90, 180, 270]) {
             color("steelblue")
             zrot(i)
@@ -170,11 +240,33 @@ module elevation_structure_base() {
             cylinder(h=ES_BASE_THICK + 2, d=ES_BASE_MOUNT_HOLE_DIAM, center=true);
         }
     }
-    zrot(-45)
-    right((RPI_MOUNT_X) / 2)
+    right(RPI_MOUNT_X/1.75)
+    zrot(90)
     rpi_mount();
 
     zrot(90)
-    right(3.75 * COMPASS_MOUNT_Y)
     compass_mount();
+
+    zrot(180)
+    right(ES_BASE_DIAM / 4)
+    gps_mount();
+
+    fwd(2.1 * GPS_MOUNT_Y)
+    zrot(145)
+    lm2596_mount();
+
+    left(LM2596_MOUNT_Y / 2)
+    back(2.1 * GPS_MOUNT_Y)
+    zrot(145)
+    lm2596_mount();
+
+    fwd(ES_BASE_DIAM / 4)
+    left(ES_BASE_DIAM / 4)
+    zrot(90)
+    drv8833_mount();
+
+    back(ES_BASE_DIAM / 4)
+    left(ES_BASE_DIAM / 4)
+    zrot(90)
+    drv8833_mount();
 }
