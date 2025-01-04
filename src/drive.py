@@ -33,8 +33,6 @@ class Drive:
         self.hall.direction = Direction.INPUT
         LOGGER.debug(f'finished setting up hall switch')
 
-        # TODO setup compass
-
         # setup stepper motor
         self.motor = StepperMotor(self.A1, self.A2, self.B1, self.B2, microsteps=self.microsteps)
         LOGGER.debug('finished setting up stepper motor')
@@ -42,7 +40,6 @@ class Drive:
         # process variables
         self.position = 0
         self.error = 0
-        self.north = self._compass()
         self.slewing = False
         self.homed = False
 
@@ -58,25 +55,6 @@ class Drive:
 
     def _trigger(self) -> bool:
         return not self.hall.value
-
-    def _compass(self):
-        '''
-        Returns an angle which points to magnetic North
-        clockwise from the y axis
-        0 deg is North
-        90 deg is East
-        180 deg is South
-        270 deg is West
-        '''
-        LOGGER.warning('TODO: implement compass')
-        # TODO read i2c compass
-        # TODO account for orientation differences between compass and mount,
-        #      not necessary if xyz-axis are aligned between mount and compass
-        x = 0
-        y = 0
-
-        # reduce the vector into an angle in degrees from the Y-axis counterclockwise
-        return atan2(x, y) * 180 / pi
 
     def rpm(self):
         steps = (360 / Drive.STEP_ANGLE) * (1 / self.ratio)
@@ -137,7 +115,6 @@ class Drive:
         LOGGER.debug(f'centered within home region at step {center}')
 
         # ok we are home
-        self.north = self._compass()
         self.position = 0  # 
         self.homed = True
         if not hold:
@@ -158,6 +135,11 @@ class Drive:
             return n_a, error_a
         return n_b, error_b
 
+    def _distance(self, D):
+        '''Computation of angular distance. '''
+        return D - self.position
+
+
     def slew(self, D, hold=False):
         '''
         Slew the drive to angle D corrected with a compass
@@ -172,7 +154,7 @@ class Drive:
         if (abs(D) >= 360):
             D = D % 360
         self.slewing = True
-        distance = (D + self.north) - self.position
+        distance = self._distance(D)
         LOGGER.debug(f'calculated change of position, {distance = :.5f}')
         if distance > 0:
             # slew forward
@@ -195,3 +177,17 @@ class Drive:
         if not hold:
             self.motor.release()
         LOGGER.info(f'slew complete, {self.position = :.5f} {self.error:.5f}')
+
+class AzDrive(Drive):
+    def __init__(self, compass, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.compass = compass
+
+    def home(self, *args, **kwargs):
+        Drive.home(self, *args, **kwargs)
+        self.north = self.compass.direction()
+
+    def _distance(self, D):
+        '''Compute angular distance but apply compass correction. '''
+        return (D + self.north) - self.position

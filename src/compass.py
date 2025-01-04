@@ -1,4 +1,5 @@
 import adafruit_mmc56x3
+from math import atan2, pi
 
 
 class Compass:
@@ -11,8 +12,22 @@ class Compass:
         c = self.magnetometer.temperature
         return x, y, z, c
 
-    def direction(self):
+    def raw_direction(self):
+        '''Returns a 3 component vector pointing to magnetic north. '''
         return self.magnetometer.magnetic
+
+    def direction(self):
+        '''
+        Returns an angle which points to magnetic North
+        clockwise from the y axis
+        0 deg is North
+        90 deg is East
+        180 deg is South
+        270 deg is West
+        '''
+        x, y, _ = self.raw_direction()
+        return atan2(x, y) * 180 / pi
+
 
     def temperature(self):
         return self.magnetometer.temperature
