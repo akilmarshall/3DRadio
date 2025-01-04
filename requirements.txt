@@ -1,1 +1,2 @@
 adafruit-circuitpython-motor
+adafruit-circuitpython-mmc56x3
