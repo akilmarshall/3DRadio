@@ -9,7 +9,7 @@ a washer between the lazy susan and static base is necessary to allow clearance 
     - control RTL SDR
     - read/write configuration from file
     - produce IQ data sets (np.ndarray)
-    - write compressed data sets from file (h5)
+    - write compressed data sets to file (h5)
 - reduce.py
     - read compressed data sets from file (h5) 
     - IQ time series 
