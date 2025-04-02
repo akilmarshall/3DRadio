@@ -371,6 +371,8 @@ if __name__ == '__main__':
                 for reducer in reducers:
                     FIG_SIZE = (6, 5)
                     reduce(reducer)
+                    LOGGER.info('pdf output disabled until pandoc upgrade')
+                    '''
                     for i in range(len(file['data'])):
                         pdf.add_page()
                         pdf.set_font('Arial', 'B', 14)
@@ -383,5 +385,6 @@ if __name__ == '__main__':
                         pdf.image(img_reference.as_posix(), 0, 80)
 
                 pdf.output(args.products / f'report-{args.data.stem}.pdf')
+                '''
             else:
                 reduce(reducer)
