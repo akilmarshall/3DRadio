@@ -8,8 +8,11 @@ import json
 import logging
 import numpy as np
 import h5py
+from itertools import product
+from enum import Enum
+import threading
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 
 logging.basicConfig(level=logging.INFO)
@@ -19,7 +22,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 @dataclass
-class Conf:
+class ConfSDR:
     # bandwidth: int = 0           # bandwidth in Hz
     center_freq: int = 1420.4e6  # center frequency in Hz
     # freq_correction: int = 0     # frequency correction in ppm
@@ -30,7 +33,8 @@ class Conf:
     # n: int = 20480               # fft width medium resolution
     # n: int = 204800              # fft width high resolution
     super_sample: int = 2
-    sdr: None | RtlSdr = None    # sdr
+    serial_number: str = '00000001'
+    # sdr: None | RtlSdr = None    # sdr
 
     def T(self):
         return 1 / self.sample_rate
@@ -44,38 +48,9 @@ class Conf:
     def signal_duration(self):
         return self.n * self.super_sample / self.super_sample
 
-
-class SDR(Conf):
-    def configure(self):
-        LOGGER.info('configuring RTL-SDR Blog V4')
-        # LOGGER.info(f'\t{self.bandwidth=} Hz')
-        LOGGER.info(f'\t{self.center_freq=} Hz')
-        # LOGGER.info(f'\t{self.gain=} dB')
-        LOGGER.info(f'\t~{self.sample_rate=} Hz')
-        LOGGER.info(f'\t{self.n=}')
-        LOGGER.info(f'\t~{self.frequency_resolution()=} Hz')
-        LOGGER.info(f'\t{self.super_sample=}')
-        if self.sdr is None:
-            LOGGER.info('initializing RTL-SDR Blog V4')
-            self.sdr = RtlSdr()
-
-        # self.sdr.bandwidth = self.bandwidth
-        self.sdr.center_freq = self.center_freq
-        self.sdr.gain = self.gain
-        self.sdr.sample_rate = self.sample_rate
-        LOGGER.info(f'{self.sdr.get_gain()=}')
-        LOGGER.info(f'{self.sdr.get_bandwidth()=}')
-        LOGGER.info(f'{self.sdr.get_sample_rate()=}')
-
-    def __del__(self):
-        if self.sdr is not None:
-            self.sdr.close()
-            LOGGER.info('closed SDR RTL V4 Blog')
-
     def metadata(self):
         '''
         Return a dict describing the SDR configuration (user provided)
-        and the real configuration as reported by the SDR.
         '''
 
         meta = {
@@ -89,42 +64,91 @@ class SDR(Conf):
                     'super_sample': self.super_sample,
                     }
                 }
-        if self.sdr:
-            meta['real'] = {
-                    'bandwidth': self.sdr.get_bandwidth(),
-                    'center_freq': self.sdr.get_center_freq(),
-                    'freq_correction': self.sdr.get_freq_correction(),
-                    'gain': self.sdr.get_gain(),
-                    'sample_rate': self.sdr.get_sample_rate(),
-                    }
+
         return meta
 
-    def to_file(self, fname: Path | str):
-        with open(fname, 'w') as f:
-            json.dump(self.metadata(), f, indent=4)
 
-        LOGGER.info(f'wrote sdr metadata to {fname}')
+class Load(str, Enum):
+    sky = 'sky'
+    zenith = 'zenith'
+    cold = 'cold'
+    hot = 'hot'
 
-    @staticmethod
-    def from_file(fname: Path | str) -> Self | None:
-        with open(fname, 'r') as f:
-            loaded = json.load(f)
-        sdr = SDR()
-        if 'set' in loaded:
-            setting = loaded['set']
-            # sdr.bandwidth = int(setting['bandwidth'])
-            sdr.center_freq = int(setting['center_freq'])
-            # sdr.freq_correction = int(setting['freq_correction'])
-            sdr.gain = setting['gain']
-            sdr.sample_rate = int(setting['sample_rate'])
-            sdr.n = int(setting['n'])
-            sdr.super_sample = int(setting['super_sample'])
-        else:
-            LOGGER.warning(f'setting data not found in {fname}')
-            return None
 
-        LOGGER.info(f'initialized SDR from {fname}')
-        return sdr
+@dataclass
+class ConfTelescope:
+    f: int # focal distance in mm
+    D: int # diameter of the reflector dish in mm
+    load: Load
+    name: str = '' # optional name of the telescope
+    note: str = '' # optional notes for the telescope
+    signal_sn: str = '00000010'  # serial number of the SDR connected to the antenna
+    reference_sn: str = '00000011'  # serial number of the SDR connected 50ohm termination
+
+    def fD(self):
+        return self.f / self.D
+
+    def metadata(self):
+        '''Return a dict describing the Telescope configuration (user provided). '''
+
+        meta = {
+                'f': self.f,
+                'D': self.D,
+                'name': self.name,
+                'note': self.note,
+                'load': self.load.value,
+                'signal_sn': self.signal_sn,
+                'reference_sn': self.reference_sn
+                }
+
+        return meta
+
+
+@dataclass
+class ConfGeneral:
+    latitude: float
+    longitude: float
+    datetime: datetime
+    row: int
+    note: str = ''
+
+    def initialize(self, offset: int = -10):
+        '''Set the timestamp. '''
+
+        offset = timedelta(hours=offset)
+        tz = timezone(offset)
+        self.datetime = datetime.now(tz)
+
+    def timestamp(self):
+        return f'{self.datetime.year}{self.datetime.month:02}{self.datetime.day:02}.{self.datetime.hour:02}{self.datetime.minute:02}'
+
+
+class SDR(ConfSDR):
+    def configure(self):
+        LOGGER.info(f'configuring RTL-SDR Blog V4 {self.serial_number=}')
+        # LOGGER.info(f'\t{self.bandwidth=} Hz')
+        LOGGER.info(f'\t{self.center_freq=} Hz')
+        # LOGGER.info(f'\t{self.gain=} dB')
+        LOGGER.info(f'\t~{self.sample_rate=} Hz')
+        LOGGER.info(f'\t{self.n=}')
+        LOGGER.info(f'\t~{self.frequency_resolution()=} Hz')
+        LOGGER.info(f'\t{self.super_sample=}')
+        # if self.sdr is None:
+        LOGGER.info(f'initializing RTL-SDR Blog V4 {self.serial_number=}')
+        self.sdr = RtlSdr(serial_number=self.serial_number)
+
+        # self.sdr.bandwidth = self.bandwidth
+        self.sdr.center_freq = self.center_freq
+        self.sdr.gain = self.gain
+        self.sdr.sample_rate = self.sample_rate
+        LOGGER.info(f'{self.sdr.get_gain()=}')
+        LOGGER.info(f'{self.sdr.get_bandwidth()=}')
+        LOGGER.info(f'{self.sdr.get_sample_rate()=}')
+
+    def __del__(self):
+        if self.sdr is not None:
+            self.sdr.close()
+            LOGGER.info(f'closed SDR RTL V4 Blog {self.serial_number=}')
 
     def integrate(self):
         if self.sdr is None:
@@ -134,7 +158,7 @@ class SDR(Conf):
         LOGGER.debug(f'reading {N} samples')
         return self.sdr.read_samples(num_samples=self.n * self.super_sample)
 
-    def integrateN(self, N: int) -> None | ndarray:
+    def integrateN(self, N: int, buffer: ndarray) -> None:
         lost_integrations = 0
         if self.sdr is None:
             LOGGER.warning('please configure the SDR')
@@ -152,16 +176,18 @@ class SDR(Conf):
             LOGGER.info('complete')
             if lost_integrations > 0:
                 LOGGER.info(f'{lost_integrations} integrations lost')
-            return np.vstack(data_set)
+            buffer[:] = np.vstack(data_set)
 
 
 def raw_data_to_file(data: ndarray, fname: Path | str):
     '''write uncompressed npy file. '''
+    LOGGER.warning('deprecated')
     np.save(fname, data)
     LOGGER.info(f'wrote data to {fname}')
 
 
 def write_h5py(data: ndarray, meta: dict, fname: Path | str):
+    LOGGER.warning('deprecated')
     LOGGER.info(f'compressing and writing data to {fname}.h5')
     with h5py.File(f'{fname}.h5', 'w') as f:
         f.create_dataset('IQ',
@@ -177,44 +203,127 @@ def write_h5py(data: ndarray, meta: dict, fname: Path | str):
 
 def raw_data_from_file(fname: Path | str) -> ndarray:
     '''load npy file. '''
+    LOGGER.warning('deprecated')
     LOGGER.info(f'loading data from {fname}')
     return np.load(fname)
 
 
 def read_h5py(fname: Path | str) -> tuple[ndarray, dict]:
+    LOGGER.warning('deprecated')
     LOGGER.info(f'loading {fname}')
     with h5py.File(fname, 'r') as f:
         return f['IQ'][:], dict(f['IQ'].attrs)
 
 
+def collect(freqs: list[float], sample_rates: list[float], ns: list[int],
+            rows: list[int], super_samples: list[int],
+            genConf: ConfGeneral, teleConf: ConfTelescope,
+            fname: str | Path):
+    '''
+    The provided list parameters overide the associate value in the Conf
+    structures. These iterations form the observation, 
+    they are performed in sequence in a cartesian product
+    freq x sample rate x n x row x super_sample
+    '''
+    with h5py.File(f'{fname}.h5', 'w') as file:
+        genConf.initialize()
+        LOGGER.debug('writing out General configuration')
+        file.attrs['latitude'] = genConf.latitude
+        file.attrs['longitude'] = genConf.longitude
+        file.attrs['datetime'] = genConf.datetime.isoformat()
+        file.attrs['row'] = rows
+        file.attrs['note'] = genConf.note
+        LOGGER.debug('writing out Telescope configuration')
+        file.attrs['f'] = teleConf.f
+        file.attrs['D'] = teleConf.D
+        file.attrs['name'] = teleConf.name
+        file.attrs['telescope-note'] = teleConf.note
+        file.attrs['load'] = teleConf.load.value
+        LOGGER.debug('writing out SDR configuration')
+        file.attrs['frequency'] = freqs
+        file.attrs['sample_rate'] = sample_rates
+        file.attrs['n'] = ns
+        file.attrs['super_sample'] = super_samples
+        # make the data group
+        offset = timedelta(hours=-10)
+        tz = timezone(offset)
+        for i, (freq, sr, n, row, ss) in enumerate(product(freqs, sample_rates, ns, rows, super_samples)):
+            LOGGER.info(f'Integrating: {freq=} {sr=} {n=} {row=} {ss=}')
+            sdr = SDR(center_freq=freq, gain='auto', sample_rate=sr, n=n,
+                      super_sample=ss, serial_number=teleConf.signal_sn)
+            sdr.configure()
+            reference = SDR(center_freq=freq, gain='auto', sample_rate=sr, n=n,
+                            super_sample=ss, serial_number=teleConf.reference_sn)
+            reference.configure()
+
+            # setup data buffers
+            width = sdr.n * sdr.super_sample
+            data_sig = np.zeros((row, width), dtype=np.complex128)
+            data_ref = np.zeros((row, width), dtype=np.complex128)
+
+            thread_data = threading.Thread(target=sdr.integrateN, args=(row, data_sig))
+            thread_reference = threading.Thread(target=reference.integrateN, args=(row, data_ref))
+
+            start = datetime.now(tz)
+            thread_data.start()
+            thread_reference.start()
+
+            thread_data.join()
+            thread_reference.join()
+            end = datetime.now(tz)
+
+            group = file.create_group(f'data/{i}')
+            group.create_dataset('IQ', data=data_sig, compression='gzip', compression_opts=5)
+            group.create_dataset('reference', data=data_ref, compression='gzip', compression_opts=5)
+
+            # write meta data for the data set
+            group.attrs['frequency'] = freq
+            group.attrs['sample_rate'] = sr
+            group.attrs['n'] = n
+            group.attrs['row'] = row
+            group.attrs['super_sample'] = ss
+            group.attrs['obs_start_time'] = start.isoformat()
+            group.attrs['obs_end_time'] = end.isoformat()
+
+        LOGGER.info(f'integrated {i + 1} times')
+
+
 if __name__ == '__main__':
     from argparse import ArgumentParser
-    import reduce
 
-    ROWS = 1000
-    SDR_CONF_DIR = Path('sdr_conf-test')
+    ROWS = [1000]
+    freqs = [1420.4e6]
+    # gains = ['auto', 1, 49.8]
+    sample_rates = [2.4e6, 2.6e6, 2.85e6, 3.0e6]
+    ns = [1024, 2048]
+    rows = [1000, 2000]
+    super_samples = [2]
+    # SDR_CONF_DIR = Path('sdr_conf-test')
     DATA_DIR = Path('data-test')
 
-    conf = Conf()
     parser = ArgumentParser()
-    parser.add_argument('--center_freq', '-f', default=conf.center_freq, type=float,
-                        help=f'center frequency, default {conf.center_freq:4E} Hz')
-    parser.add_argument('--gain', '-g', default=conf.gain,
-                        help=f'gain, default {conf.gain} dB')
-    parser.add_argument('--sample_rate', '-s', default=conf.sample_rate, type=float,
-                        help=f'sample rate, default {conf.sample_rate:4E} Hz')
-    parser.add_argument('--n', '-n', default=conf.n, type=int, help=f'How many samples per call to the ADC (powers of 2 only!), default {conf.n}')
-    parser.add_argument('--rows', '-r', default=ROWS, type=int, help=f'How many rows of data to take, default {ROWS}')
-    parser.add_argument('--super_sample', '-S', default=conf.super_sample, type=int,
-                        help=f'Multiplies the sample width, default {conf.super_sample}')
-    parser.add_argument('--nosave', default=True, action='store_false',
-                        help='Pass this flag to stop a data file from being written')
-    parser.add_argument('--show', default=False, action='store_true',
-                        help='Pass this flag to show the integrated spectra')
+    parser.add_argument('--center_freq', '-f', default=freqs, type=float,
+                        nargs='+',
+                        help=f'center frequency, default {freqs} Hz')
+    # parser.add_argument('--gain', '-g', default=gains,
+    #                     help=f'gain, default {gains} dB')
+    parser.add_argument('--sample_rate', '-s', default=sample_rates, type=float,
+                        nargs='+',
+                        help=f'sample rate, default {sample_rates} Hz')
+    parser.add_argument('--n', '-n', default=ns, type=int,
+                        nargs='+',
+                        help=f'how many samples per call to the ADC (powers of 2 only!), default {ns}')
+    parser.add_argument('--rows', '-r', default=ROWS, type=int,
+                        nargs='+',
+                        help=f'how many rows of data to take, default {ROWS}')
+    parser.add_argument('--super_sample', '-S', default=super_samples, type=int,
+                        nargs='+',
+                        help=f'multiplies the sample width, default {super_samples}')
     parser.add_argument('--data', default=DATA_DIR, type=Path,
                         help=f'define the directory to store the data files in, default {DATA_DIR}')
-    parser.add_argument('--meta', default=SDR_CONF_DIR, type=Path,
-                        help=f'define the directory to store the metadata files in, default {SDR_CONF_DIR}')
+    parser.add_argument('--note', help='note describing the dataset')
+    parser.add_argument('--tele_note', help='note describing the telescope')
+    parser.add_argument('--tele_name', help='name of the telescope and/or configuration')
 
     args = parser.parse_args()
 
@@ -222,10 +331,19 @@ if __name__ == '__main__':
         args.data.mkdir()
         LOGGER.info(f'created {args.data} for storing data files')
 
-    if not (args.meta.exists() and args.meta.is_dir()):
-        args.meta.mkdir()
-        LOGGER.info(f'created {args.meta} for storing metadata ')
+    genConf = ConfGeneral(0, 0, 0, args.rows[0], args.note)
+    genConf.initialize()
+    teleConf = ConfTelescope(216, 540, Load.sky, args.tele_name, args.tele_note)
+    collect(args.center_freq,
+            args.sample_rate,
+            args.n,
+            args.rows,
+            args.super_sample,
+            genConf,
+            teleConf,
+            args.data / genConf.timestamp())
 
+    '''
     sdr = SDR(
             center_freq=args.center_freq,
             gain=args.gain if args.gain == 'auto' else float(args.gain),
@@ -248,3 +366,4 @@ if __name__ == '__main__':
         write_h5py(data, sdr.metadata(), args.data / time_stamp)
     if args.show:
         reduce.spectrum_integration(data, sdr.metadata()['set'], show=True)
+    '''
