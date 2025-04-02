@@ -299,7 +299,7 @@ if __name__ == '__main__':
     rows = [1000, 2000]
     super_samples = [2]
     # SDR_CONF_DIR = Path('sdr_conf-test')
-    DATA_DIR = Path('data-test')
+    DATA_DIR = Path('data')
 
     parser = ArgumentParser()
     parser.add_argument('--center_freq', '-f', default=freqs, type=float,
