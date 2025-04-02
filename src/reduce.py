@@ -3,13 +3,17 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy import ndarray, array
-from scipy.signal import welch, get_window
+from scipy.signal import welch, get_window, correlate
 import logging
+from fpdf import FPDF
+import h5py
+# from PIL import Image
 
 
 logging.basicConfig(level=logging.DEBUG)
 logging.getLogger('h5py').setLevel(logging.WARNING)
-# logging.getLogger('matplotlib').setLevel(logging.WARNING)
+logging.getLogger('matplotlib').setLevel(logging.WARNING)
+logging.getLogger('PIL').setLevel(logging.WARNING)
 LOGGER = logging.getLogger(__name__)
 FIG_SIZE = (25, 8)
 
@@ -36,6 +40,8 @@ def plot_complex_timeseries(series: array, show: bool = True,
     if show:
         plt.show()
 
+    plt.close()
+
 
 def plot_magnitude_phase_timeseries(series: array, show: bool = True,
                                     fname: None | str | Path = None):
@@ -61,6 +67,8 @@ def plot_magnitude_phase_timeseries(series: array, show: bool = True,
     if show:
         plt.show()
 
+    plt.close()
+
 
 def plot_magnitude_histogram(series: array, show: bool = True,
                              fname: None | str | Path = None):
@@ -78,6 +86,8 @@ def plot_magnitude_histogram(series: array, show: bool = True,
     if show:
         plt.show()
 
+    plt.close()
+
 
 # def plot_spectrogram(n, N):
 #     '''Short-Time Fourier Transform (STFT). '''
@@ -94,7 +104,7 @@ def plot_magnitude_histogram(series: array, show: bool = True,
 #     plt.show()
 
 
-def plot_spectrum(series: array, meta: dict, nbins: int = 8192, N_SEG_LIM=2048,
+def plot_spectrum(series: array, attrs: dict, nbins: int = 8192, N_SEG_LIM=2048,
                   show: bool = True, fname: None | Path | str = None):
     window = 'hann'
     if nbins < N_SEG_LIM:
@@ -123,11 +133,13 @@ def plot_spectrum(series: array, meta: dict, nbins: int = 8192, N_SEG_LIM=2048,
     plt.grid()
     plt.tight_layout()
     if fname:
-        _fname = f'{fname}'
+        _fname = f'{fname}.png'
         plt.savefig(_fname)
         LOGGER.info(f'wrote out {_fname}')
     if show:
         plt.show()
+
+    plt.close()
 
 
 def spectrum_integration(data: ndarray, meta: dict, nbins: int = 8192,
@@ -159,7 +171,7 @@ def spectrum_integration(data: ndarray, meta: dict, nbins: int = 8192,
     P_avg_db_hz = 10. * np.log10(P_avg_hz)
 
     # Shift frequency spectra back to the intended range
-    freqs = (freqs + meta['center_freq']) / 1e6
+    freqs = (freqs + meta['frequency']) / 1e6
     plt.figure(figsize=FIG_SIZE)
     plt.title('Power Spectral Density Estimate')
     plt.xlabel('Frequency (MHz)')
@@ -173,73 +185,203 @@ def spectrum_integration(data: ndarray, meta: dict, nbins: int = 8192,
         LOGGER.info(f'wrote out {_fname}')
     if show:
         plt.show()
+    plt.close()
+
+
+def autocorrelate(data: ndarray, meta: dict, show: bool = True,
+                  fname: None | Path | str = None):
+    ACF = list()
+    for sample in data:
+        acf = correlate(sample, sample, mode='full', method='fft')
+        # Normalize the autocorrelation function
+        acf /= np.max(acf)
+        ACF.append(acf)
+
+    # Create a time lag vector for plotting
+    lags = np.arange(0, len(data[0])) / meta['sample_rate']
+
+    ACF = np.vstack(ACF)
+    # average the autocorrelation functions
+    acf = np.sum(ACF, axis=0) / len(ACF)
+
+    # Plot the autocorrelation function
+    import matplotlib.pyplot as plt
+    plt.figure(figsize=FIG_SIZE)
+    plt.title('Mean Autocorrelation Function')
+    plt.xlabel('Lag (seconds?)')
+    plt.ylim(-0.02, 0.02)
+    # plt.ylabel('Autocorrelation')
+    plt.plot(lags, acf[len(lags) - 1:])
+    plt.grid(True)
+    if fname:
+        _fname = f'{fname}.png'
+        plt.savefig(_fname)
+        LOGGER.info(f'wrote out {_fname}')
+    if show:
+        plt.show()
+
+    plt.close()
 
 
 if __name__ == '__main__':
-    import collect
     from argparse import ArgumentParser
 
-    SPECTRA_DIR = Path('spectra')
-    reducers = ['iq_timeseries', 'magnitude_phase_timeseries',
-                'magnitude_histogram', 'spectrum']
+    PRODUCTS_DIR = Path('reduction-products')
+    # all
+    # reducers = ['iq_timeseries', 'magnitude_phase_timeseries',
+    #             'magnitude_histogram', 'spectrum', 'autocorrelate']
+    # spectral
+    reducers = ['spectrum', 'autocorrelate']
 
     parser = ArgumentParser()
-    parser.add_argument('reducer', type=str,
+    parser.add_argument('--reducer', '-r', type=str, nargs='+',
                         help='In which way would you like to reduce the data?')
-    parser.add_argument('data', type=Path, help='path to h5py data file')
+    parser.add_argument('--data', '-d', type=Path, help='path to h5py data file')
     parser.add_argument('--show', action='store_true', default=False,
                         help='pass to open plot interactively')
-    # parser.add_argument('--fname', default=None,
-    #                     help='optional path to write plot to')
     parser.add_argument('--save', default=False, action='store_true',
                         help='pass this flag to write to file')
     parser.add_argument('--n', default=None, type=int,
                         help='select a row in a dataset, otherwise mean of dataset')
-    parser.add_argument('--spectra', default=SPECTRA_DIR, type=Path, 
-                        help=f'define the directory to store spectra in, default {SPECTRA_DIR}')
+    parser.add_argument('--products', default=PRODUCTS_DIR, type=Path, 
+                        help=f'define the directory to store reduction prodcuts in, default {PRODUCTS_DIR}')
 
     args = parser.parse_args()
-    if not (args.spectra.exists() and args.spectra.is_dir()):
-        args.spectra.mkdir(parents=True)
-        LOGGER.info(f'created {args.spectra} to store spectral images')
+    if not (args.products.exists() and args.products.is_dir()):
+        args.products.mkdir(parents=True)
+        LOGGER.info(f'created {args.products} to store reduction products')
 
     fname = None
     if args.save:
-        fname = args.spectra / args.data.stem
+        fname = args.products / args.data.stem
 
-    match args.reducer:
-        case 'iq_timeseries':
-            LOGGER.debug('iq_timeseries reduction')
-            data, _ = collect.read_h5py(args.data)
-            if args.n:
-                plot_complex_timeseries(data[args.n], args.show, fname)
-            else:
-                plot_complex_timeseries(data.mean(axis=0), args.show, fname)
+    # data, meta = collect.read_h5py(args.data)
+    with h5py.File(args.data, 'r') as file:
+        def reduce(option):
+            match option:
+                case 'iq_timeseries':
+                    LOGGER.debug('iq_timeseries reduction')
+                    if args.n:
+                        # TODO just plot the nth
+                        pass
+                    else:
+                        for i in range(len(file['data'])):
+                            data = file[f'data/{i}/IQ'][:]
+                            ref = file[f'data/{i}/reference'][:]
+                            plot_complex_timeseries(
+                                    data.mean(axis=0),
+                                    args.show,
+                                    args.products / f'{args.data.stem}-{option}-{i}-signal')
+                            plot_complex_timeseries(
+                                    ref.mean(axis=0),
+                                    args.show,
+                                    args.products / f'{args.data.stem}-{option}-{i}-reference')
 
-        case 'magnitude_phase_timeseries':
-            LOGGER.debug('magnitude_phase_timeseries reduction')
-            data, _ = collect.read_h5py(args.data)
-            if args.n:
-                plot_magnitude_phase_timeseries(data[args.n], args.show, fname)
-            else:
-                plot_magnitude_phase_timeseries(data.mean(axis=0), args.show, fname)
+                case 'magnitude_phase_timeseries':
+                    LOGGER.debug('magnitude_phase_timeseries reduction')
+                    if args.n:
+                        # TODO just plot the nth
+                        pass
+                    else:
+                        for i in range(len(file['data'])):
+                            data = file[f'data/{i}/IQ'][:]
+                            ref = file[f'data/{i}/reference'][:]
+                            plot_magnitude_phase_timeseries(
+                                    data.mean(axis=0),
+                                    args.show,
+                                    args.products / f'{args.data.stem}-{option}-{i}-signal')
+                            plot_magnitude_phase_timeseries(
+                                    ref.mean(axis=0),
+                                    args.show,
+                                    args.products / f'{args.data.stem}-{option}-{i}-reference')
 
-        case 'magnitude_histogram':
-            LOGGER.debug('magnitude_phase_timeseries reduction')
-            data, _ = collect.read_h5py(args.data)
-            if args.n:
-                plot_magnitude_histogram(data[args.n], args.show, fname)
-            else:
-                plot_magnitude_histogram(data.mean(axis=0), args.show, fname)
+                case 'magnitude_histogram':
+                    LOGGER.debug('magnitude_phase_timeseries reduction')
+                    if args.n:
+                        # plot_magnitude_histogram(data[args.n], args.show, fname)
+                        pass
+                    else:
+                        for i in range(len(file['data'])):
+                            data = file[f'data/{i}/IQ'][:]
+                            ref = file[f'data/{i}/reference'][:]
+                            plot_magnitude_histogram(
+                                    data.mean(axis=0),
+                                    args.show,
+                                    args.products / f'{args.data.stem}-{option}-{i}-signal')
+                            plot_magnitude_histogram(
+                                    ref.mean(axis=0),
+                                    args.show,
+                                    args.products / f'{args.data.stem}-{option}-{i}-reference')
 
-        case 'spectrum':
-            LOGGER.debug('spectrum reduction')
-            data, meta = collect.read_h5py(args.data)
-            if args.n:
-                LOGGER.info('integrating 1 row')
-                plot_spectrum(data[args.n], meta, show=args.show, fname=fname)
+                case 'spectrum':
+                    LOGGER.debug('spectrum reduction')
+                    if args.n:
+                        # LOGGER.info('integrating 1 row')
+                        # plot_spectrum(data[args.n], meta, show=args.show, fname=fname)
+                        pass
+                    else:
+                        for i in range(len(file['data'])):
+                            group = file[f'data/{i}']
+                            data = group['IQ'][:]
+                            ref = group['reference'][:]
+                            LOGGER.info('integrating the data set')
+                            spectrum_integration(
+                                    data,
+                                    group.attrs,
+                                    show=args.show,
+                                    fname=args.products / f'{args.data.stem}-{option}-{i}-signal')
+                            spectrum_integration(
+                                    ref,
+                                    group.attrs,
+                                    show=args.show,
+                                    fname=args.products / f'{args.data.stem}-{option}-{i}-reference')
+                case 'autocorrelate':
+                    for i in range(len(file['data'])):
+                        group = file[f'data/{i}']
+                        data = group['IQ'][:]
+                        ref = group['reference'][:]
+                        LOGGER.debug('autocorrelation function reduction')
+                        autocorrelate(
+                                data,
+                                group.attrs,
+                                show=args.show,
+                                fname=args.products / f'{args.data.stem}-{option}-{i}-signal')
+                        autocorrelate(
+                                ref,
+                                group.attrs,
+                                show=args.show,
+                                fname=args.products / f'{args.data.stem}-{option}-{i}-reference')
+                case _:
+                    LOGGER.info(f'Reducers: {reducers}')
+
+        for reducer in args.reducer:
+            if reducer == 'all':
+                class PDF(FPDF):
+                    def header(self):
+                        self.set_font('Arial', 'B', 14)
+                        self.cell(0, 10, args.data.stem, ln=True, align='C')
+
+                pdf = PDF()
+                pdf.add_page()
+                pdf.set_font('Arial', 'B', 10)
+                for i, key in enumerate(file.attrs.keys()):
+                    val = file.attrs[key]
+                    pdf.cell(10, 10, f'{key} = {val}', 0, 1)
+
+                for reducer in reducers:
+                    FIG_SIZE = (6, 5)
+                    reduce(reducer)
+                    for i in range(len(file['data'])):
+                        pdf.add_page()
+                        pdf.set_font('Arial', 'B', 14)
+                        img_signal = args.products / f'{args.data.stem}-{reducer}-{i}-signal.png'
+                        img_reference = args.products / f'{args.data.stem}-{reducer}-{i}-reference.png'
+                        LOGGER.debug(img_signal, img_reference)
+                        attrs = "\n".join(f"{k} = {v}" for k, v in file[f'/data/{i}'].attrs.items())
+                        pdf.multi_cell(150, 8, attrs, align='L')
+                        pdf.image(img_signal.as_posix(), 0, 80)
+                        pdf.image(img_reference.as_posix(), 0, 80)
+
+                pdf.output(args.products / f'report-{args.data.stem}.pdf')
             else:
-                LOGGER.info('integrating the data set')
-                spectrum_integration(data, meta, show=args.show, fname=fname)
-        case _:
-            LOGGER.info(f'Reducers: {reducers}')
+                reduce(reducer)
