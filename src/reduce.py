@@ -320,7 +320,6 @@ if __name__ == '__main__':
                         for i in range(len(file['data'])):
                             data = file[f'data/{i}/IQ'][1:]
                             ref = file[f'data/{i}/reference'][1:]
-                            breakpoint()
                             plot_complex_timeseries(
                                     data.mean(axis=0),
                                     ref.mean(axis=0),
