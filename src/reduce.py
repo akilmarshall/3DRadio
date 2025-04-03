@@ -15,23 +15,44 @@ logging.getLogger('h5py').setLevel(logging.WARNING)
 logging.getLogger('matplotlib').setLevel(logging.WARNING)
 logging.getLogger('PIL').setLevel(logging.WARNING)
 LOGGER = logging.getLogger(__name__)
-FIG_SIZE = (25, 8)
+# FIG_SIZE = (25, 8)
+FIG_SIZE = (18, 8)
 
 
-def plot_complex_timeseries(series: array, show: bool = True,
+def plot_complex_timeseries(signal: array, reference: array, show: bool = True,
                             fname: None | str | Path = None):
-    fig, axs = plt.subplots(2, figsize=FIG_SIZE, sharex=True)
+    corrected = signal - reference
+
+    fig, axs = plt.subplots(2, 3, figsize=FIG_SIZE, sharex='col', sharey='row')
     fig.suptitle('Normed IQ Time-series')
     fig.supxlabel('step')
     fig.supylabel('')
 
-    axs[0].set_title('Real')
-    axs[0].plot(series.real, color='tab:blue')
-    axs[0].grid()
+    axs[0][0].set_ylabel('Real Part')
 
-    axs[1].set_title('Imaginary')
-    axs[1].plot(series.imag, color='tab:green')
-    axs[1].grid()
+    axs[0][0].set_title('Signal')
+    axs[0][0].plot(signal.real, color='tab:blue')
+    axs[0][0].grid()
+
+    axs[0][1].set_title('Reference')
+    axs[0][1].plot(reference.real, color='tab:blue')
+    axs[0][1].grid()
+
+    axs[0][2].set_title('Corrected = Signal - Reference')
+    axs[0][2].plot(corrected.real, color='tab:blue')
+    axs[0][2].grid()
+
+    axs[1][0].set_ylabel('Imaginary Part')
+
+    axs[1][0].plot(signal.imag, color='tab:green')
+    axs[1][0].grid()
+
+    axs[1][1].plot(reference.imag, color='tab:green')
+    axs[1][1].grid()
+
+    axs[1][2].plot(corrected.imag, color='tab:green')
+    axs[1][2].grid()
+
     plt.tight_layout()
     if fname:
         _fname = f'{fname}.png'
@@ -43,21 +64,38 @@ def plot_complex_timeseries(series: array, show: bool = True,
     plt.close()
 
 
-def plot_magnitude_phase_timeseries(series: array, show: bool = True,
+def plot_magnitude_phase_timeseries(signal: array, reference: array, show: bool = True,
                                     fname: None | str | Path = None):
-    fig, axs = plt.subplots(2, figsize=FIG_SIZE, sharex=True)
+    corrected = signal - reference
+
+    fig, axs = plt.subplots(2, 3, figsize=FIG_SIZE, sharex='col', sharey='row')
     fig.suptitle('Magnitude & Phase Time-series')
     fig.supxlabel('time')
 
-    axs[0].set_title('Magnitude')
-    axs[0].plot(np.abs(series), color='tab:blue')
-    axs[0].set_ylabel('Normed Magnitude')
-    axs[0].grid()
+    axs[0][0].set_ylabel('Normed Magnitude')
 
-    axs[1].set_title('Phase Angle')
-    axs[1].plot(np.angle(series) * 180 / np.pi, color='tab:green')
-    axs[1].set_ylabel('Angle (degree)')
-    axs[1].grid()
+    axs[0][0].set_title('Signal')
+    axs[0][0].plot(np.abs(signal), color='tab:orange')
+    axs[0][0].grid()
+
+    axs[0][1].set_title('Reference')
+    axs[0][1].plot(np.abs(reference), color='tab:orange')
+    axs[0][1].grid()
+
+    axs[0][2].set_title('Corrected = Signal - Reference')
+    axs[0][2].plot(np.abs(corrected), color='tab:orange')
+    axs[0][2].grid()
+
+    axs[1][0].set_ylabel('Angle (degree)')
+
+    axs[1][0].plot(np.angle(signal) * 180 / np.pi, color='tab:pink')
+    axs[1][0].grid()
+
+    axs[1][1].plot(np.angle(reference) * 180 / np.pi, color='tab:pink')
+    axs[1][1].grid()
+
+    axs[1][2].plot(np.angle(corrected) * 180 / np.pi, color='tab:pink')
+    axs[1][2].grid()
 
     plt.tight_layout()
     if fname:
@@ -70,14 +108,28 @@ def plot_magnitude_phase_timeseries(series: array, show: bool = True,
     plt.close()
 
 
-def plot_magnitude_histogram(series: array, show: bool = True,
+def plot_magnitude_histogram(signal: array, reference: array, show: bool = True,
                              fname: None | str | Path = None):
-    plt.figure(figsize=FIG_SIZE)
-    plt.title('IQ Magnitude Histogram')
-    plt.xlabel('Normed Magnitude')
-    plt.ylabel('Density')
-    plt.hist(np.abs(series), bins=100, density=True)
-    plt.grid()
+    corrected = signal - reference
+
+    fig, axs = plt.subplots(1, 3, figsize=FIG_SIZE, sharey=True, sharex=True)
+    # plt.figure(figsize=FIG_SIZE)
+    fig.suptitle('IQ Magnitude Histogram\n(PDF Estimate)')
+    fig.supxlabel('Normed Magnitude')
+    fig.supylabel('Density')
+
+    axs[0].set_title('Signal')
+    axs[0].hist(np.abs(signal), bins=100, density=True, color='tab:orange')
+    axs[0].grid()
+
+    axs[1].set_title('Reference')
+    axs[1].hist(np.abs(reference), bins=100, density=True, color='tab:orange')
+    axs[1].grid()
+
+    axs[2].set_title('Corrected = Signal - Reference')
+    axs[2].hist(np.abs(corrected), bins=100, density=True, color='tab:orange')
+    axs[2].grid()
+
     plt.tight_layout()
     if fname:
         _fname = f'{fname}.png'
@@ -268,19 +320,11 @@ if __name__ == '__main__':
                         for i in range(len(file['data'])):
                             data = file[f'data/{i}/IQ'][:]
                             ref = file[f'data/{i}/reference'][:]
-                            corrected = data - ref
                             plot_complex_timeseries(
                                     data.mean(axis=0),
-                                    args.show,
-                                    args.products / f'{args.data.stem}-{option}-{i}-signal')
-                            plot_complex_timeseries(
                                     ref.mean(axis=0),
                                     args.show,
-                                    args.products / f'{args.data.stem}-{option}-{i}-reference')
-                            plot_complex_timeseries(
-                                    corrected.mean(axis=0),
-                                    args.show,
-                                    args.products / f'{args.data.stem}-{option}-{i}-corrected')
+                                    args.products / f'{args.data.stem}-{option}-{i}')
 
                 case 'magnitude_phase_timeseries':
                     LOGGER.info('Magnitude Phase Timeseries Reduction')
@@ -294,16 +338,9 @@ if __name__ == '__main__':
                             corrected = data - ref
                             plot_magnitude_phase_timeseries(
                                     data.mean(axis=0),
-                                    args.show,
-                                    args.products / f'{args.data.stem}-{option}-{i}-signal')
-                            plot_magnitude_phase_timeseries(
                                     ref.mean(axis=0),
                                     args.show,
-                                    args.products / f'{args.data.stem}-{option}-{i}-reference')
-                            plot_magnitude_phase_timeseries(
-                                    corrected.mean(axis=0),
-                                    args.show,
-                                    args.products / f'{args.data.stem}-{option}-{i}-corrected')
+                                    args.products / f'{args.data.stem}-{option}-{i}')
 
                 case 'magnitude_histogram':
                     LOGGER.info('Magnitude Phase Timeseries Reduction')
@@ -314,19 +351,11 @@ if __name__ == '__main__':
                         for i in range(len(file['data'])):
                             data = file[f'data/{i}/IQ'][:]
                             ref = file[f'data/{i}/reference'][:]
-                            corrected = data - ref
                             plot_magnitude_histogram(
                                     data.mean(axis=0),
-                                    args.show,
-                                    args.products / f'{args.data.stem}-{option}-{i}-signal')
-                            plot_magnitude_histogram(
                                     ref.mean(axis=0),
                                     args.show,
-                                    args.products / f'{args.data.stem}-{option}-{i}-reference')
-                            plot_magnitude_histogram(
-                                    corrected.mean(axis=0),
-                                    args.show,
-                                    args.products / f'{args.data.stem}-{option}-{i}-corrected')
+                                    args.products / f'{args.data.stem}-{option}-{i}')
 
                 case 'spectrum':
                     LOGGER.info('Spectrum Reduction')
@@ -396,7 +425,7 @@ if __name__ == '__main__':
                 #     pdf.cell(10, 10, f'{key} = {val}', 0, 1)
 
                 for reducer in reducers:
-                    FIG_SIZE = (6, 5)
+                    # FIG_SIZE = (6, 5)
                     reduce(reducer)
                     LOGGER.info('pdf output disabled until pandoc upgrade')
                     '''
