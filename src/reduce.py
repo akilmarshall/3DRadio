@@ -228,10 +228,10 @@ if __name__ == '__main__':
 
     PRODUCTS_DIR = Path('reduction-products')
     # all
-    # reducers = ['iq_timeseries', 'magnitude_phase_timeseries',
-    #             'magnitude_histogram', 'spectrum', 'autocorrelate']
+    reducers = ['iq_timeseries', 'magnitude_phase_timeseries',
+                'magnitude_histogram', 'spectrum', 'autocorrelate']
     # spectral
-    reducers = ['spectrum', 'autocorrelate']
+    # reducers = ['spectrum', 'autocorrelate']
 
     parser = ArgumentParser()
     parser.add_argument('--reducer', '-r', type=str, nargs='+',
@@ -260,7 +260,7 @@ if __name__ == '__main__':
         def reduce(option):
             match option:
                 case 'iq_timeseries':
-                    LOGGER.debug('iq_timeseries reduction')
+                    LOGGER.info('IQ Timeseries Reduction')
                     if args.n:
                         # TODO just plot the nth
                         pass
@@ -268,6 +268,7 @@ if __name__ == '__main__':
                         for i in range(len(file['data'])):
                             data = file[f'data/{i}/IQ'][:]
                             ref = file[f'data/{i}/reference'][:]
+                            corrected = data - ref
                             plot_complex_timeseries(
                                     data.mean(axis=0),
                                     args.show,
@@ -276,9 +277,13 @@ if __name__ == '__main__':
                                     ref.mean(axis=0),
                                     args.show,
                                     args.products / f'{args.data.stem}-{option}-{i}-reference')
+                            plot_complex_timeseries(
+                                    corrected.mean(axis=0),
+                                    args.show,
+                                    args.products / f'{args.data.stem}-{option}-{i}-corrected')
 
                 case 'magnitude_phase_timeseries':
-                    LOGGER.debug('magnitude_phase_timeseries reduction')
+                    LOGGER.info('Magnitude Phase Timeseries Reduction')
                     if args.n:
                         # TODO just plot the nth
                         pass
@@ -286,6 +291,7 @@ if __name__ == '__main__':
                         for i in range(len(file['data'])):
                             data = file[f'data/{i}/IQ'][:]
                             ref = file[f'data/{i}/reference'][:]
+                            corrected = data - ref
                             plot_magnitude_phase_timeseries(
                                     data.mean(axis=0),
                                     args.show,
@@ -294,9 +300,13 @@ if __name__ == '__main__':
                                     ref.mean(axis=0),
                                     args.show,
                                     args.products / f'{args.data.stem}-{option}-{i}-reference')
+                            plot_magnitude_phase_timeseries(
+                                    corrected.mean(axis=0),
+                                    args.show,
+                                    args.products / f'{args.data.stem}-{option}-{i}-corrected')
 
                 case 'magnitude_histogram':
-                    LOGGER.debug('magnitude_phase_timeseries reduction')
+                    LOGGER.info('Magnitude Phase Timeseries Reduction')
                     if args.n:
                         # plot_magnitude_histogram(data[args.n], args.show, fname)
                         pass
@@ -304,6 +314,7 @@ if __name__ == '__main__':
                         for i in range(len(file['data'])):
                             data = file[f'data/{i}/IQ'][:]
                             ref = file[f'data/{i}/reference'][:]
+                            corrected = data - ref
                             plot_magnitude_histogram(
                                     data.mean(axis=0),
                                     args.show,
@@ -312,19 +323,24 @@ if __name__ == '__main__':
                                     ref.mean(axis=0),
                                     args.show,
                                     args.products / f'{args.data.stem}-{option}-{i}-reference')
+                            plot_magnitude_histogram(
+                                    corrected.mean(axis=0),
+                                    args.show,
+                                    args.products / f'{args.data.stem}-{option}-{i}-corrected')
 
                 case 'spectrum':
-                    LOGGER.debug('spectrum reduction')
+                    LOGGER.info('Spectrum Reduction')
                     if args.n:
                         # LOGGER.info('integrating 1 row')
                         # plot_spectrum(data[args.n], meta, show=args.show, fname=fname)
                         pass
                     else:
+                        LOGGER.debug('integrating the data set')
                         for i in range(len(file['data'])):
                             group = file[f'data/{i}']
                             data = group['IQ'][:]
                             ref = group['reference'][:]
-                            LOGGER.info('integrating the data set')
+                            corrected = data - ref
                             spectrum_integration(
                                     data,
                                     group.attrs,
@@ -335,12 +351,18 @@ if __name__ == '__main__':
                                     group.attrs,
                                     show=args.show,
                                     fname=args.products / f'{args.data.stem}-{option}-{i}-reference')
+                            spectrum_integration(
+                                    corrected,
+                                    group.attrs,
+                                    show=args.show,
+                                    fname=args.products / f'{args.data.stem}-{option}-{i}-corrected')
                 case 'autocorrelate':
+                    LOGGER.info('Autocorrelation Function Reduction')
                     for i in range(len(file['data'])):
                         group = file[f'data/{i}']
                         data = group['IQ'][:]
                         ref = group['reference'][:]
-                        LOGGER.debug('autocorrelation function reduction')
+                        corrected = data - ref
                         autocorrelate(
                                 data,
                                 group.attrs,
@@ -351,22 +373,27 @@ if __name__ == '__main__':
                                 group.attrs,
                                 show=args.show,
                                 fname=args.products / f'{args.data.stem}-{option}-{i}-reference')
+                        autocorrelate(
+                                corrected,
+                                group.attrs,
+                                show=args.show,
+                                fname=args.products / f'{args.data.stem}-{option}-{i}-corrected')
                 case _:
                     LOGGER.info(f'Reducers: {reducers}')
 
         for reducer in args.reducer:
             if reducer == 'all':
-                class PDF(FPDF):
-                    def header(self):
-                        self.set_font('Arial', 'B', 14)
-                        self.cell(0, 10, args.data.stem, ln=True, align='C')
+                # class PDF(FPDF):
+                #     def header(self):
+                #         self.set_font('Arial', 'B', 14)
+                #         self.cell(0, 10, args.data.stem, ln=True, align='C')
 
-                pdf = PDF()
-                pdf.add_page()
-                pdf.set_font('Arial', 'B', 10)
-                for i, key in enumerate(file.attrs.keys()):
-                    val = file.attrs[key]
-                    pdf.cell(10, 10, f'{key} = {val}', 0, 1)
+                # pdf = PDF()
+                # pdf.add_page()
+                # pdf.set_font('Arial', 'B', 10)
+                # for i, key in enumerate(file.attrs.keys()):
+                #     val = file.attrs[key]
+                #     pdf.cell(10, 10, f'{key} = {val}', 0, 1)
 
                 for reducer in reducers:
                     FIG_SIZE = (6, 5)
