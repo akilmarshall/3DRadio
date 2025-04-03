@@ -318,8 +318,9 @@ if __name__ == '__main__':
                         pass
                     else:
                         for i in range(len(file['data'])):
-                            data = file[f'data/{i}/IQ'][:]
-                            ref = file[f'data/{i}/reference'][:]
+                            data = file[f'data/{i}/IQ'][1:]
+                            ref = file[f'data/{i}/reference'][1:]
+                            breakpoint()
                             plot_complex_timeseries(
                                     data.mean(axis=0),
                                     ref.mean(axis=0),
@@ -333,8 +334,8 @@ if __name__ == '__main__':
                         pass
                     else:
                         for i in range(len(file['data'])):
-                            data = file[f'data/{i}/IQ'][:]
-                            ref = file[f'data/{i}/reference'][:]
+                            data = file[f'data/{i}/IQ'][1:]
+                            ref = file[f'data/{i}/reference'][1:]
                             corrected = data - ref
                             plot_magnitude_phase_timeseries(
                                     data.mean(axis=0),
@@ -349,8 +350,8 @@ if __name__ == '__main__':
                         pass
                     else:
                         for i in range(len(file['data'])):
-                            data = file[f'data/{i}/IQ'][:]
-                            ref = file[f'data/{i}/reference'][:]
+                            data = file[f'data/{i}/IQ'][1:]
+                            ref = file[f'data/{i}/reference'][1:]
                             plot_magnitude_histogram(
                                     data.mean(axis=0),
                                     ref.mean(axis=0),
@@ -367,8 +368,8 @@ if __name__ == '__main__':
                         LOGGER.debug('integrating the data set')
                         for i in range(len(file['data'])):
                             group = file[f'data/{i}']
-                            data = group['IQ'][:]
-                            ref = group['reference'][:]
+                            data = group['IQ'][1:]
+                            ref = group['reference'][1:]
                             corrected = data - ref
                             spectrum_integration(
                                     data,
@@ -389,8 +390,8 @@ if __name__ == '__main__':
                     LOGGER.info('Autocorrelation Function Reduction')
                     for i in range(len(file['data'])):
                         group = file[f'data/{i}']
-                        data = group['IQ'][:]
-                        ref = group['reference'][:]
+                        data = group['IQ'][1:]
+                        ref = group['reference'][1:]
                         corrected = data - ref
                         autocorrelate(
                                 data,
