@@ -5,7 +5,7 @@ import numpy as np
 from numpy import ndarray, array
 from scipy.signal import welch, get_window, correlate
 import logging
-from fpdf import FPDF
+# from fpdf import FPDF
 import h5py
 # from PIL import Image
 
