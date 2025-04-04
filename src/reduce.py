@@ -194,7 +194,7 @@ def plot_spectrum(series: array, attrs: dict, nbins: int = 8192, N_SEG_LIM=2048,
     plt.close()
 
 
-def spectrum_integration(data: ndarray, meta: dict, nbins: int = 8192,
+def spectrum_integration(signal: ndarray, reference:ndarray, meta: dict, nbins: int = 8192,
                          N_SEG_LIM=2048, show: bool = True,
                          fname: None | Path | str = None):
     window = 'hann'
@@ -203,33 +203,50 @@ def spectrum_integration(data: ndarray, meta: dict, nbins: int = 8192,
     else:
         nperseg = N_SEG_LIM
 
-    freqs = np.zeros(nbins)
-    Pxx_total = np.zeros(nbins)
 
-    for iq in data:
-        # compensate for DC spike
-        iq = (iq.real - iq.real.mean()) + (1j * (iq.imag - iq.imag.mean()))
-        freqs, p_xx = welch(iq, fs=meta['sample_rate'], nperseg=nperseg,
-                            nfft=nbins, noverlap=0, scaling='spectrum',
-                            window=window, detrend=False, return_onesided=False)
-        Pxx_total += p_xx
+    def process(data):
+        freqs = np.zeros(nbins)
+        Pxx_total = np.zeros(nbins)
+        for iq in data:
+            # compensate for DC spike
+            iq = (iq.real - iq.real.mean()) + (1j * (iq.imag - iq.imag.mean()))
+            freqs, p_xx = welch(iq, fs=meta['sample_rate'], nperseg=nperseg,
+                                nfft=nbins, noverlap=0, scaling='spectrum',
+                                window=window, detrend=False, return_onesided=False)
+            Pxx_total += p_xx
 
-    freqs = np.fft.fftshift(freqs)
-    Pxx_total = np.fft.fftshift(Pxx_total)
+        freqs = np.fft.fftshift(freqs)
+        Pxx_total = np.fft.fftshift(Pxx_total)
 
-    P_avg = Pxx_total / len(data)
-    win = get_window(window, nperseg)
-    P_avg_hz = P_avg * ((win.sum()**2) / (win*win).sum()) / meta['sample_rate']
-    P_avg_db_hz = 10. * np.log10(P_avg_hz)
+        P_avg = Pxx_total / len(data)
+        win = get_window(window, nperseg)
+        P_avg_hz = P_avg * ((win.sum()**2) / (win*win).sum()) / meta['sample_rate']
+        P_avg_db_hz = 10. * np.log10(P_avg_hz)
+        # Shift frequency spectra back to the intended range
+        freqs = (freqs + meta['frequency']) / 1e6
+        return freqs, P_avg_db_hz
+    
+    freqs_sig, P_sig = process(signal)
+    freqs_ref, P_ref = process(reference)
+    freqs_cor, P_cor = process(signal - reference)
 
-    # Shift frequency spectra back to the intended range
-    freqs = (freqs + meta['frequency']) / 1e6
-    plt.figure(figsize=FIG_SIZE)
-    plt.title('Power Spectral Density Estimate')
-    plt.xlabel('Frequency (MHz)')
-    plt.ylabel('Power Spectral Density (dB/Hz)')
-    plt.plot(freqs, P_avg_db_hz)
-    plt.grid()
+    fig, axs = plt.subplots(3, figsize=FIG_SIZE, sharey=True, sharex=True)
+    fig.suptitle('Power Spectral Density Estimate')
+    fig.supxlabel('Frequency (MHz)')
+    fig.supylabel('Power Spectral Density (dB/Hz)')
+
+    axs[0].set_title('Signal')
+    axs[0].plot(freqs_sig, P_sig)
+    axs[0].grid()
+
+    axs[1].set_title('Reference')
+    axs[1].plot(freqs_ref, P_ref)
+    axs[1].grid()
+
+    axs[2].set_title('Corrected = Signal - Reference')
+    axs[2].plot(freqs_cor, P_cor)
+    axs[2].grid()
+
     plt.tight_layout()
     if fname:
         _fname = f'{fname}.png'
@@ -240,31 +257,46 @@ def spectrum_integration(data: ndarray, meta: dict, nbins: int = 8192,
     plt.close()
 
 
-def autocorrelate(data: ndarray, meta: dict, show: bool = True,
+def autocorrelate(signal: ndarray, reference: ndarray, meta: dict, show: bool = True,
                   fname: None | Path | str = None):
-    ACF = list()
-    for sample in data:
-        acf = correlate(sample, sample, mode='full', method='fft')
-        # Normalize the autocorrelation function
-        acf /= np.max(acf)
-        ACF.append(acf)
+    def compute(data):
+        ACF = list()
+        for sample in data:
+            acf = correlate(sample, sample, mode='full', method='fft')
+            # Normalize the autocorrelation function
+            acf /= np.max(acf)
+            ACF.append(acf)
 
-    # Create a time lag vector for plotting
-    lags = np.arange(0, len(data[0])) / meta['sample_rate']
+        # Create a time lag vector for plotting
+        lags = np.arange(0, len(data[0])) / meta['sample_rate']
 
-    ACF = np.vstack(ACF)
-    # average the autocorrelation functions
-    acf = np.sum(ACF, axis=0) / len(ACF)
+        ACF = np.vstack(ACF)
+        # average the autocorrelation functions
+        return lags, np.sum(ACF, axis=0) / len(ACF)
 
-    # Plot the autocorrelation function
-    import matplotlib.pyplot as plt
-    plt.figure(figsize=FIG_SIZE)
-    plt.title('Mean Autocorrelation Function')
-    plt.xlabel('Lag (seconds?)')
-    plt.ylim(-0.02, 0.02)
-    # plt.ylabel('Autocorrelation')
-    plt.plot(lags, acf[len(lags) - 1:])
-    plt.grid(True)
+    lags_sig, acf_sig = compute(signal)
+    lags_ref, acf_ref = compute(reference)
+    lags_cor, acf_cor = compute(signal - reference)
+
+    fig, axs = plt.subplots(3, figsize=FIG_SIZE, sharey=True, sharex=True)
+    # plt.figure(figsize=FIG_SIZE)
+    fig.suptitle('Mean Autocorrelation Function')
+    fig.supxlabel('Lag (second)')
+    plt.ylim(-0.5, 0.5)
+
+    axs[0].set_title('Signal')
+    axs[0].plot(lags_sig, acf_sig[len(lags_sig) - 1:])
+    axs[0].grid(True)
+
+    axs[1].set_title('Reference')
+    axs[1].plot(lags_ref, acf_ref[len(lags_ref) - 1:])
+    axs[1].grid(True)
+
+    axs[2].set_title('Corrected = Signal - Reference')
+    axs[2].plot(lags_cor, acf_cor[len(lags_cor) - 1:])
+    axs[2].grid(True)
+
+    plt.tight_layout()
     if fname:
         _fname = f'{fname}.png'
         plt.savefig(_fname)
@@ -337,7 +369,6 @@ if __name__ == '__main__':
                         for i in range(len(file['data'])):
                             data = file[f'data/{i}/IQ'][1:]
                             ref = file[f'data/{i}/reference'][1:]
-                            corrected = data - ref
                             plot_magnitude_phase_timeseries(
                                     data.mean(axis=0),
                                     ref.mean(axis=0),
@@ -359,7 +390,7 @@ if __name__ == '__main__':
                                     args.show,
                                     path_stem / f'{i}-{option}')
 
-                case 'spectrum':
+                case 'spectrum' | 'spectral':
                     LOGGER.info('Spectrum Reduction')
                     if args.n:
                         # LOGGER.info('integrating 1 row')
@@ -371,44 +402,24 @@ if __name__ == '__main__':
                             group = file[f'data/{i}']
                             data = group['IQ'][1:]
                             ref = group['reference'][1:]
-                            corrected = data - ref
                             spectrum_integration(
                                     data,
-                                    group.attrs,
-                                    show=args.show,
-                                    fname=path_stem / f'{i}-{option}-signal')
-                            spectrum_integration(
                                     ref,
                                     group.attrs,
                                     show=args.show,
-                                    fname=path_stem / f'{i}-{option}-reference')
-                            spectrum_integration(
-                                    corrected,
-                                    group.attrs,
-                                    show=args.show,
-                                    fname=path_stem / f'{i}-{option}-corrected')
-                case 'autocorrelate':
+                                    fname=path_stem / f'{i}-spectral')
+                case 'autocorrelate' | 'acf' | 'ACF' | 'auto':
                     LOGGER.info('Autocorrelation Function Reduction')
                     for i in range(len(file['data'])):
                         group = file[f'data/{i}']
                         data = group['IQ'][1:]
                         ref = group['reference'][1:]
-                        corrected = data - ref
                         autocorrelate(
                                 data,
-                                group.attrs,
-                                show=args.show,
-                                fname=path_stem / f'{i}-{option}-signal')
-                        autocorrelate(
                                 ref,
                                 group.attrs,
                                 show=args.show,
-                                fname=path_stem / f'{i}-{option}-reference')
-                        autocorrelate(
-                                corrected,
-                                group.attrs,
-                                show=args.show,
-                                fname=path_stem / f'{i}-{option}-corrected')
+                                fname=path_stem / f'{i}-ACF')
                 case _:
                     LOGGER.info(f'Reducers: {reducers}')
 
