@@ -23,10 +23,10 @@ LOGGER = logging.getLogger(__name__)
 
 @dataclass
 class ConfSDR:
+    gain: float # gain in dB
     # bandwidth: int = 0           # bandwidth in Hz
     center_freq: int = 1420.4e6  # center frequency in Hz
     # freq_correction: int = 0     # frequency correction in ppm
-    gain: str | float = 'auto'   # gain in dB
     sample_rate: int = 2.85e6    # sample rate in Hz (f_s)
     n: int = 1024
     # n: int = 2048                # fft width low resolution
@@ -293,7 +293,7 @@ if __name__ == '__main__':
 
     ROWS = [1000]
     freqs = [1420.4e6]
-    # gains = ['auto', 1, 49.8]
+    # gains = [1, 49.8]
     sample_rates = [2.4e6, 2.6e6, 2.85e6, 3.0e6]
     ns = [1024, 2048]
     rows = [1000, 2000]
@@ -305,8 +305,8 @@ if __name__ == '__main__':
     parser.add_argument('--center_freq', '-f', default=freqs, type=float,
                         nargs='+',
                         help=f'center frequency, default {freqs} Hz')
-    # parser.add_argument('--gain', '-g', default=gains,
-    #                     help=f'gain, default {gains} dB')
+    parser.add_argument('--gain', '-g', type=float, default=20,
+                        help='gain in dB, valid values in [1, 49.8]')
     parser.add_argument('--sample_rate', '-s', default=sample_rates, type=float,
                         nargs='+',
                         help=f'sample rate, default {sample_rates} Hz')
@@ -342,28 +342,3 @@ if __name__ == '__main__':
             genConf,
             teleConf,
             args.data / genConf.timestamp())
-
-    '''
-    sdr = SDR(
-            center_freq=args.center_freq,
-            gain=args.gain if args.gain == 'auto' else float(args.gain),
-            sample_rate=args.sample_rate,
-            n=args.n,
-            super_sample=args.super_sample)
-    sdr.configure()
-    now = datetime.now()
-    time_stamp = f'{now.year}{now.month:02}{now.day:02}.{now.hour:02}{now.minute:02}'
-    start = datetime.now()
-    data = sdr.integrateN(args.rows)
-    end = datetime.now()
-    duration = end - start
-    _min, sec = divmod(duration.total_seconds(), 60)
-    cs = duration.microseconds // 10000  # Convert microseconds to centiseconds
-    LOGGER.info(f'integration duration {int(_min):02}:{int(sec):02}:{cs:02}')
-    if args.nosave:
-        sdr.to_file(args.meta / time_stamp)
-        # raw_data_to_file(data, fname=args.data / time_stamp)
-        write_h5py(data, sdr.metadata(), args.data / time_stamp)
-    if args.show:
-        reduce.spectrum_integration(data, sdr.metadata()['set'], show=True)
-    '''
