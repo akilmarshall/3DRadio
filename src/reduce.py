@@ -299,17 +299,19 @@ if __name__ == '__main__':
                         help=f'define the directory to store reduction prodcuts in, default {PRODUCTS_DIR}')
 
     args = parser.parse_args()
-    if not (args.products.exists() and args.products.is_dir()):
-        args.products.mkdir(parents=True)
-        LOGGER.info(f'created {args.products} to store reduction products')
 
     fname = None
     if args.save:
         fname = args.products / args.data.stem
 
-    # data, meta = collect.read_h5py(args.data)
+
     with h5py.File(args.data, 'r') as file:
         def reduce(option):
+            path_stem = args.products / args.data.stem
+            if not (path_stem.exists() and path_stem.is_dir()):
+                path_stem.mkdir(parents=True)
+                LOGGER.debug(f'created {path_stem} to stored reduction products')
+
             match option:
                 case 'iq_timeseries':
                     LOGGER.info('IQ Timeseries Reduction')
@@ -324,7 +326,7 @@ if __name__ == '__main__':
                                     data.mean(axis=0),
                                     ref.mean(axis=0),
                                     args.show,
-                                    args.products / f'{args.data.stem}-{option}-{i}')
+                                    path_stem / f'{i}-{option}')
 
                 case 'magnitude_phase_timeseries':
                     LOGGER.info('Magnitude Phase Timeseries Reduction')
@@ -340,7 +342,7 @@ if __name__ == '__main__':
                                     data.mean(axis=0),
                                     ref.mean(axis=0),
                                     args.show,
-                                    args.products / f'{args.data.stem}-{option}-{i}')
+                                    path_stem / f'{i}-{option}')
 
                 case 'magnitude_histogram':
                     LOGGER.info('Magnitude Phase Timeseries Reduction')
@@ -355,7 +357,7 @@ if __name__ == '__main__':
                                     data.mean(axis=0),
                                     ref.mean(axis=0),
                                     args.show,
-                                    args.products / f'{args.data.stem}-{option}-{i}')
+                                    path_stem / f'{i}-{option}')
 
                 case 'spectrum':
                     LOGGER.info('Spectrum Reduction')
@@ -374,17 +376,17 @@ if __name__ == '__main__':
                                     data,
                                     group.attrs,
                                     show=args.show,
-                                    fname=args.products / f'{args.data.stem}-{option}-{i}-signal')
+                                    fname=path_stem / f'{i}-{option}-signal')
                             spectrum_integration(
                                     ref,
                                     group.attrs,
                                     show=args.show,
-                                    fname=args.products / f'{args.data.stem}-{option}-{i}-reference')
+                                    fname=path_stem / f'{i}-{option}-reference')
                             spectrum_integration(
                                     corrected,
                                     group.attrs,
                                     show=args.show,
-                                    fname=args.products / f'{args.data.stem}-{option}-{i}-corrected')
+                                    fname=path_stem / f'{i}-{option}-corrected')
                 case 'autocorrelate':
                     LOGGER.info('Autocorrelation Function Reduction')
                     for i in range(len(file['data'])):
@@ -396,17 +398,17 @@ if __name__ == '__main__':
                                 data,
                                 group.attrs,
                                 show=args.show,
-                                fname=args.products / f'{args.data.stem}-{option}-{i}-signal')
+                                fname=path_stem / f'{i}-{option}-signal')
                         autocorrelate(
                                 ref,
                                 group.attrs,
                                 show=args.show,
-                                fname=args.products / f'{args.data.stem}-{option}-{i}-reference')
+                                fname=path_stem / f'{i}-{option}-reference')
                         autocorrelate(
                                 corrected,
                                 group.attrs,
                                 show=args.show,
-                                fname=args.products / f'{args.data.stem}-{option}-{i}-corrected')
+                                fname=path_stem / f'{i}-{option}-corrected')
                 case _:
                     LOGGER.info(f'Reducers: {reducers}')
 
