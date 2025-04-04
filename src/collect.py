@@ -128,7 +128,7 @@ class SDR(ConfSDR):
         LOGGER.info(f'configuring RTL-SDR Blog V4 {self.serial_number=}')
         # LOGGER.info(f'\t{self.bandwidth=} Hz')
         LOGGER.info(f'\t{self.center_freq=} Hz')
-        # LOGGER.info(f'\t{self.gain=} dB')
+        LOGGER.info(f'\t{self.gain=} dB')
         LOGGER.info(f'\t~{self.sample_rate=} Hz')
         LOGGER.info(f'\t{self.n=}')
         LOGGER.info(f'\t~{self.frequency_resolution()=} Hz')
@@ -216,7 +216,7 @@ def read_h5py(fname: Path | str) -> tuple[ndarray, dict]:
 
 
 def collect(freqs: list[float], sample_rates: list[float], ns: list[int],
-            rows: list[int], super_samples: list[int],
+            rows: list[int], super_samples: list[int], gain: float,
             genConf: ConfGeneral, teleConf: ConfTelescope,
             fname: str | Path):
     '''
@@ -249,10 +249,10 @@ def collect(freqs: list[float], sample_rates: list[float], ns: list[int],
         tz = timezone(offset)
         for i, (freq, sr, n, row, ss) in enumerate(product(freqs, sample_rates, ns, rows, super_samples)):
             LOGGER.info(f'Integrating: {freq=} {sr=} {n=} {row=} {ss=}')
-            sdr = SDR(center_freq=freq, gain='auto', sample_rate=sr, n=n,
+            sdr = SDR(center_freq=freq, gain=gain, sample_rate=sr, n=n,
                       super_sample=ss, serial_number=teleConf.signal_sn)
             sdr.configure()
-            reference = SDR(center_freq=freq, gain='auto', sample_rate=sr, n=n,
+            reference = SDR(center_freq=freq, gain=gain, sample_rate=sr, n=n,
                             super_sample=ss, serial_number=teleConf.reference_sn)
             reference.configure()
 
@@ -293,7 +293,6 @@ if __name__ == '__main__':
 
     ROWS = [1000]
     freqs = [1420.4e6]
-    # gains = [1, 49.8]
     sample_rates = [2.4e6, 2.6e6, 2.85e6, 3.0e6]
     ns = [1024, 2048]
     rows = [1000, 2000]
@@ -339,6 +338,7 @@ if __name__ == '__main__':
             args.n,
             args.rows,
             args.super_sample,
+            args.gain,
             genConf,
             teleConf,
             args.data / genConf.timestamp())
