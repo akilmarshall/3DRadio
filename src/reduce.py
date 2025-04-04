@@ -333,12 +333,20 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     with h5py.File(args.data, 'r') as file:
-        def reduce(option):
-            path_stem = args.products / args.data.stem
-            if not (path_stem.exists() and path_stem.is_dir()):
-                path_stem.mkdir(parents=True)
-                LOGGER.debug(f'created {path_stem} to stored reduction products')
+        path_stem = args.products / args.data.stem
 
+        if not (path_stem.exists() and path_stem.is_dir()):
+            path_stem.mkdir(parents=True)
+            LOGGER.debug(f'created {path_stem} to stored reduction products')
+
+        # write out dataset wide metadata
+        with open(path_stem / 'metadata.txt', 'w') as metadata:
+            for i, (key, val) in enumerate(file.attrs.items()):
+                if i > 0:
+                    metadata.write('\n')
+                metadata.write(f'{key}: {val}')
+
+        def reduce(option):
             match option:
                 case 'iq_timeseries':
                     LOGGER.info('IQ Timeseries Reduction')
@@ -347,6 +355,13 @@ if __name__ == '__main__':
                         pass
                     else:
                         for i in range(len(file['data'])):
+                            # write metadata for the row
+                            with open(path_stem / f'{i}-metadata.txt', 'w') as metadata:
+                                for j, (key, val) in enumerate(file[f'data/{i}'].attrs.items()):
+                                    if j > 0:
+                                        metadata.write('\n')
+                                    metadata.write(f'{key}: {val}')
+
                             data = file[f'data/{i}/IQ'][1:]
                             ref = file[f'data/{i}/reference'][1:]
                             plot_complex_timeseries(
@@ -362,6 +377,13 @@ if __name__ == '__main__':
                         pass
                     else:
                         for i in range(len(file['data'])):
+                            # write metadata for the row
+                            with open(path_stem / f'{i}-metadata.txt', 'w') as metadata:
+                                for j, (key, val) in enumerate(file[f'data/{i}'].attrs.items()):
+                                    if j > 0:
+                                        metadata.write('\n')
+                                    metadata.write(f'{key}: {val}')
+
                             data = file[f'data/{i}/IQ'][1:]
                             ref = file[f'data/{i}/reference'][1:]
                             plot_magnitude_phase_timeseries(
@@ -377,6 +399,13 @@ if __name__ == '__main__':
                         pass
                     else:
                         for i in range(len(file['data'])):
+                            # write metadata for the row
+                            with open(path_stem / f'{i}-metadata.txt', 'w') as metadata:
+                                for j, (key, val) in enumerate(file[f'data/{i}'].attrs.items()):
+                                    if j > 0:
+                                        metadata.write('\n')
+                                    metadata.write(f'{key}: {val}')
+
                             data = file[f'data/{i}/IQ'][1:]
                             ref = file[f'data/{i}/reference'][1:]
                             plot_magnitude_histogram(
@@ -394,6 +423,13 @@ if __name__ == '__main__':
                     else:
                         LOGGER.debug('integrating the data set')
                         for i in range(len(file['data'])):
+                            # write metadata for the row
+                            with open(path_stem / f'{i}-metadata.txt', 'w') as metadata:
+                                for j, (key, val) in enumerate(file[f'data/{i}'].attrs.items()):
+                                    if j > 0:
+                                        metadata.write('\n')
+                                    metadata.write(f'{key}: {val}')
+
                             group = file[f'data/{i}']
                             data = group['IQ'][1:]
                             ref = group['reference'][1:]
@@ -406,6 +442,13 @@ if __name__ == '__main__':
                 case 'autocorrelate' | 'acf' | 'ACF' | 'auto':
                     LOGGER.info('Autocorrelation Function Reduction')
                     for i in range(len(file['data'])):
+                        # write metadata for the row
+                        with open(path_stem / f'{i}-metadata.txt', 'w') as metadata:
+                            for j, (key, val) in enumerate(file[f'data/{i}'].attrs.items()):
+                                if j > 0:
+                                    metadata.write('\n')
+                                metadata.write(f'{key}: {val}')
+
                         group = file[f'data/{i}']
                         data = group['IQ'][1:]
                         ref = group['reference'][1:]
