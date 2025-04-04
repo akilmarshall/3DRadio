@@ -332,11 +332,6 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    fname = None
-    if args.save:
-        fname = args.products / args.data.stem
-
-
     with h5py.File(args.data, 'r') as file:
         def reduce(option):
             path_stem = args.products / args.data.stem
