@@ -291,33 +291,32 @@ def collect(freqs: list[float], sample_rates: list[float], ns: list[int],
 if __name__ == '__main__':
     from argparse import ArgumentParser
 
-    ROWS = [1000]
-    freqs = [1420.4e6]
-    sample_rates = [2.4e6, 2.6e6, 2.85e6, 3.0e6]
-    ns = [1024, 2048]
-    rows = [1000, 2000]
-    super_samples = [2]
+    ROWS = [500]
+    FREQS = [1420.4e6]
+    SAMPLE_RATES = [2.6e6, 2.85e6]
+    NS = [2**17, 2**18]
+    SUPER_SAMPLES = [2]
     # SDR_CONF_DIR = Path('sdr_conf-test')
     DATA_DIR = Path('data')
 
     parser = ArgumentParser()
-    parser.add_argument('--center_freq', '-f', default=freqs, type=float,
+    parser.add_argument('--center_freq', '-f', default=FREQS, type=float,
                         nargs='+',
-                        help=f'center frequency, default {freqs} Hz')
+                        help=f'center frequency, default {FREQS} Hz')
     parser.add_argument('--gain', '-g', type=float, default=20,
                         help='gain in dB, valid values in [1, 49.8]')
-    parser.add_argument('--sample_rate', '-s', default=sample_rates, type=float,
+    parser.add_argument('--sample_rate', '-s', default=SAMPLE_RATES, type=float,
                         nargs='+',
-                        help=f'sample rate, default {sample_rates} Hz')
-    parser.add_argument('--n', '-n', default=ns, type=int,
+                        help=f'sample rate, default {SAMPLE_RATES} Hz')
+    parser.add_argument('--n', '-n', default=NS, type=int,
                         nargs='+',
                         help=f'how many samples per call to the ADC (powers of 2 only!), default {ns}')
     parser.add_argument('--rows', '-r', default=ROWS, type=int,
                         nargs='+',
                         help=f'how many rows of data to take, default {ROWS}')
-    parser.add_argument('--super_sample', '-S', default=super_samples, type=int,
+    parser.add_argument('--super_sample', '-S', default=SUPER_SAMPLES, type=int,
                         nargs='+',
-                        help=f'multiplies the sample width, default {super_samples}')
+                        help=f'multiplies the sample width, default {SUPER_SAMPLES}')
     parser.add_argument('--data', default=DATA_DIR, type=Path,
                         help=f'define the directory to store the data files in, default {DATA_DIR}')
     parser.add_argument('--note', help='note describing the dataset')
