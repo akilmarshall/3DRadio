@@ -3,7 +3,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy import ndarray, array
-from scipy.signal import welch, get_window, correlate
+from scipy.signal import welch, get_window, correlate, lfilter
 import logging
 # from fpdf import FPDF
 import h5py
@@ -307,13 +307,101 @@ def autocorrelate(signal: ndarray, reference: ndarray, meta: dict, show: bool = 
     plt.close()
 
 
+def differential_radiometer(signal: ndarray, reference:ndarray, meta: dict, show: bool = True,fname: None | Path | str = None):
+    nbins: int = 8192
+    N_SEG_LIM = 2048
+
+    window = 'hann'
+    if nbins < N_SEG_LIM:
+        nperseg = nbins
+    else:
+        nperseg = N_SEG_LIM
+
+
+    def process(data):
+        freqs = np.zeros(nbins)
+        Pxx_total = np.zeros(nbins)
+        for iq in data:
+            # compensate for DC spike
+            iq = (iq.real - iq.real.mean()) + (1j * (iq.imag - iq.imag.mean()))
+            freqs, p_xx = welch(iq, fs=meta['sample_rate'], nperseg=nperseg,
+                                nfft=nbins, noverlap=0, scaling='spectrum',
+                                window=window, detrend=False, return_onesided=False)
+            Pxx_total += p_xx
+
+        freqs = np.fft.fftshift(freqs)
+        Pxx_total = np.fft.fftshift(Pxx_total)
+
+        P_avg = Pxx_total / len(data)
+        win = get_window(window, nperseg)
+        P_avg_hz = P_avg * ((win.sum()**2) / (win*win).sum()) / meta['sample_rate']
+        P_avg_db_hz = 10. * np.log10(P_avg_hz)
+        # Shift frequency spectra back to the intended range
+        freqs = (freqs + meta['frequency']) / 1e6
+        return freqs, P_avg_db_hz
+
+    alpha = 0.9
+    a = [1 - alpha]
+    b = [1, -alpha]
+    N = 10  # decimation, 1 in N
+
+    sig = np.abs(signal) ** 2
+    ref = np.abs(reference) ** 2
+    cor = lfilter(a, b, sig - ref)
+
+    f_sig, P_sig = process(sig[::N])
+    f_ref, P_ref = process(ref[::N])
+    f_cor, P_cor = process(cor[::N])
+
+    sig = sig.mean(axis=1)
+    ref = ref.mean(axis=1)
+    cor = cor.mean(axis=1)  # todo single pole IIR filter
+
+
+    fig, axs = plt.subplots(2, 3, figsize=FIG_SIZE, sharey='row', sharex='row')
+    fig.suptitle('Differential Radiometer')
+    # fig.supylabel('Power?')
+
+    axs[0][0].set_title('Signal')
+    axs[0][0].plot(sig)
+    axs[0][0].grid(True)
+
+    axs[1][0].plot(f_sig, P_sig)
+    axs[1][0].grid(True)
+
+    axs[0][1].set_title('Reference')
+    axs[0][1].plot(ref)
+    axs[0][1].grid(True)
+
+    axs[1][1].plot(f_ref, P_ref)
+    axs[1][1].grid(True)
+
+    axs[0][2].set_title('Signal - Reference')
+    axs[0][2].plot(cor)
+    axs[0][2].grid(True)
+
+    axs[1][2].plot(f_cor, P_cor)
+    axs[1][2].grid(True)
+
+    plt.tight_layout()
+    if fname:
+        _fname = f'{fname}.png'
+        plt.savefig(_fname)
+        LOGGER.info(f'wrote out {_fname}')
+    if show:
+        plt.show()
+
+    plt.close()
+
+
 if __name__ == '__main__':
     from argparse import ArgumentParser
 
     PRODUCTS_DIR = Path('reduction-products')
     # all
     reducers = ['iq_timeseries', 'magnitude_phase_timeseries',
-                'magnitude_histogram', 'spectrum', 'autocorrelate']
+                'magnitude_histogram', 'spectrum', 'autocorrelate',
+                'differential']
     # spectral
     # reducers = ['spectrum', 'autocorrelate']
 
@@ -458,6 +546,26 @@ if __name__ == '__main__':
                                 group.attrs,
                                 show=args.show,
                                 fname=path_stem / f'{i}-ACF')
+
+                case 'differential' | 'diff':
+                    LOGGER.info('Differential Radiometer Reduction')
+                    for i in range(len(file['data'])):
+                        # write metadata for the row
+                        with open(path_stem / f'{i}-metadata.txt', 'w') as metadata:
+                            for j, (key, val) in enumerate(file[f'data/{i}'].attrs.items()):
+                                if j > 0:
+                                    metadata.write('\n')
+                                metadata.write(f'{key}: {val}')
+
+                        group = file[f'data/{i}']
+                        data = group['IQ'][1:]
+                        ref = group['reference'][1:]
+                        differential_radiometer(
+                                data,
+                                ref,
+                                group.attrs,
+                                show=args.show,
+                                fname=path_stem / f'{i}-differential')
                 case _:
                     LOGGER.info(f'Reducers: {reducers}')
 
